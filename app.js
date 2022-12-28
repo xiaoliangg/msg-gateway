@@ -1,5 +1,7 @@
 const http = require('http');
 
+// 只需创建一个 app.js 即可运行
+// 参考:https://nodejs.org/en/docs/guides/getting-started-guide/
 const hostname = '127.0.0.1';
 const port = 3000;
 
