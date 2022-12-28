@@ -1,0 +1,15 @@
+{
+  "name": "nodejs_helloworld",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "pm2 start ecosystem.config.js --env development",
+    "start": "pm2 start ecosystem.config.js --env production",
+    "stop": "pm2 stop index.js",
+    "restart": "pm2 reload index.js --node-args='--harmony'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
