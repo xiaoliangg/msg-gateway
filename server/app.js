@@ -16,5 +16,5 @@ const server = http.createServer((req, res) => {
 server.listen(port, hostname, () => {
     console.log(`Server running at http://${hostname}:${port}/`);
     // 当启用test 和 start时,输出的环境不一样，测试通过
-    // console.log(`Server running environment: ${environment}/`);
+    console.log(`Server running environment: ${environment}/`);
 });
