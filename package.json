@@ -9,7 +9,13 @@
     "stop": "pm2 stop index.js",
     "restart": "pm2 reload index.js --node-args='--harmony'"
   },
-  "keywords": [],
+  "dependencies": {
+    "md5": "^2.2.1"
+  },
+  "devDependencies": {
+    "http-proxy": "1.18.1"
+  },
+    "keywords": [],
   "author": "",
   "license": "ISC"
 }
