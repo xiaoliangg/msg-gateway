@@ -108,6 +108,10 @@ server.on('upgrade', function (req, socket, head) {
         console.error("wrong ws host!!!!!")
     }
 });
+// 重点: 1、客户端断开重连。   2、某节点崩溃的场景。       技术点:客户端断开的监听，目标服务断开的监听。
+// 报警机制；  代理服务的平滑下线；    目标服务的主动平滑下线(重点)。 1.标记某个服务下线(页面配置) 2.代理服务将下线服务的长连接进行迁移。 技术点:代理服务迁移和目标服务的长连接
+// 重点: nginx reload机制：目标服务加减节点，更新代理服务的配置文件，无需重启。
+// 代理服务的集群无需实现!。
 console.log("listening on port 5051")
 server.listen(5051);
 
