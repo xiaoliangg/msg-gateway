@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "pm2 start ecosystem.config.js --env development",
+    "dev:debug": "cross-env NODE_ENV=development node --inspect=9100 index.js",
     "start": "pm2 start ecosystem.config.js --env production",
     "stop": "pm2 stop index.js",
     "restart": "pm2 reload index.js --node-args='--harmony'"
