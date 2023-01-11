@@ -1,5 +1,6 @@
 const http = require('http');
 const url = require('url');
+const mm = require('http-proxy/lib/http-proxy/passes/test22');
 
 // 只需创建一个 app.js 即可运行
 // 参考:https://nodejs.org/en/docs/guides/getting-started-guide/
@@ -32,7 +33,7 @@ var servers_send = [
 var servers_send_ws = [
     'http://localhost:15041',
     'http://localhost:15042',
-    'http://localhost:15043',
+    // 'http://localhost:15043',
 ];
 
 // 模拟消息分发服务的http短连接
@@ -100,10 +101,10 @@ server.on('upgrade', function (req, socket, head) {
         console.log(parseObj.query.a1);
         //获取第一个server
         var target = servers_send_ws.shift();
-        //将HTTP请求传递给目标node进程
-        proxy.ws(req, socket, head,{target: target });
         //将第一个server放在末尾，以实现循环地指向不同进程
         servers_send_ws.push(target)
+        //将HTTP请求传递给目标node进程
+        proxy.ws(req, socket, head,{target: target });
     }else{
         console.error("wrong ws host!!!!!")
     }
@@ -118,15 +119,33 @@ server.on('upgrade', function (req, socket, head) {
 // Listen for the `error` event on `proxy`.
 // 貌似对应服务器断开
 proxy.on('error', function (err, req, res) {
-    res.writeHead(500, {
-        'Content-Type': 'text/plain'
-    });
+    // if(res.functions.indexOf("writeHead" > -1)){
+    //     res.writeHead(500, {
+    //         'Content-Type': 'text/plain'
+    //     });
+    // }
 
-    res.end('Something went wrong. And we are reporting a custom error message.');
+    // res.end('Something went wrong. And we are reporting a custom error message.');
+    console('11111111');
+
 });
 
 proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
     console.log('RAW proxyReqWs from the target', JSON.stringify(proxyReq.headers, true, 2));
+});
+
+proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
+    var parseObj = url.parse(req.url,true);
+    var result = mm.mm.get(parseObj.query.a1);
+
+    //获取第一个server
+    var target = servers_send_ws.shift();
+    //将第一个server放在末尾，以实现循环地指向不同进程
+    servers_send_ws.push(target)
+    //将HTTP请求传递给目标node进程
+    proxy.ws(result.req, result.socket, result.head,{target: target });
+
+    console.log('111connectOtherNode11111111');
 });
 
 // Listen for the `close` event on `proxy`.
@@ -134,6 +153,13 @@ proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
 proxy.on('close', function (res, socket, head) {
     // view disconnected websocket connections
     console.log('Client disconnected');
+});
+
+//
+// Listen for the `proxyRes` event on `proxy`.
+//
+proxy.on('proxyRes', function (proxyRes, req, res) {
+    console.log('RAW Response from the target', JSON.stringify(proxyRes.headers, true, 2));
 });
 console.log("listening on port 5051")
 server.listen(5051);
