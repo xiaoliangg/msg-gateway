@@ -8,15 +8,17 @@
     "dev:debug": "cross-env NODE_ENV=development node --inspect=9100 index.js",
     "start": "pm2 start ecosystem.config.js --env production",
     "stop": "pm2 stop index.js",
-    "restart": "pm2 reload index.js --node-args='--harmony'"
+    "restart": "pm2 reload index.js --node-args='--harmony'",
+    "postinstall": "patch-package"
   },
   "dependencies": {
-    "md5": "^2.2.1"
+    "md5": "^2.2.1",
+    "patch-package": "^6.5.1"
   },
   "devDependencies": {
     "http-proxy": "1.18.1"
   },
-    "keywords": [],
+  "keywords": [],
   "author": "",
   "license": "ISC"
 }
