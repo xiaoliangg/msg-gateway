@@ -1,3 +1,48 @@
+diff --git a/node_modules/http-proxy/lib/http-proxy/index.js b/node_modules/http-proxy/lib/http-proxy/index.js
+index 977a4b3..75a7811 100644
+--- a/node_modules/http-proxy/lib/http-proxy/index.js
++++ b/node_modules/http-proxy/lib/http-proxy/index.js
+@@ -28,19 +28,24 @@ httpProxy.Server = ProxyServer;
+ function createRightProxy(type) {
+ 
+   return function(options) {
+-    return function(req, res /*, [head], [opts] */) {
++    return function(req, res /*, [head], [opts] */) { // 当请求是ws类型时,res就是Socket类。已验证
+       var passes = (type === 'ws') ? this.wsPasses : this.webPasses,
++          // yl https://stackoverflow.com/questions/2125714/explanation-of-slice-call-in-javascript
++          // yl 效果:make arguments a real Array
+           args = [].slice.call(arguments),
+           cntr = args.length - 1,
+           head, cbl;
+ 
+       /* optional args parse begin */
++      // 解析回调函数,并赋给cbl。如果需要回调函数的话，可以在最后一个参数传入
+       if(typeof args[cntr] === 'function') {
+         cbl = args[cntr];
+ 
+         cntr--;
+       }
+ 
++      // 混入该请求中特定的配置项 opts
++      // options 是原有配置项,倒数第二个参数传入该请求的特定配置项。 目标服务的地址在此参数传入，当然也可以传其他特定参数
+       var requestOptions = options;
+       if(
+         !(args[cntr] instanceof Buffer) &&
+@@ -54,12 +59,13 @@ function createRightProxy(type) {
+         cntr--;
+       }
+ 
++      // yl 如果倒数第三个参数类型为Buffer,那么赋给head变量
+       if(args[cntr] instanceof Buffer) {
+         head = args[cntr];
+       }
+ 
+       /* optional args parse end */
+-
++      // 请求的目标地址
+       ['target', 'forward'].forEach(function(e) {
+         if (typeof requestOptions[e] === 'string')
+           requestOptions[e] = parse_url(requestOptions[e]);
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/test22.js b/node_modules/http-proxy/lib/http-proxy/passes/test22.js
 new file mode 100644
 index 0000000..6096c94
@@ -8,7 +53,7 @@ index 0000000..6096c94
 +    mm: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..9a18e6b 100644
+index 270f23f..d4f26f2 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,8 @@
@@ -29,22 +74,65 @@ index 270f23f..9a18e6b 100644
    /**
     * WebSocket requests must have the `GET` method and
     * the `upgrade:websocket` header
-@@ -118,7 +121,8 @@ module.exports = {
+@@ -97,9 +100,13 @@ module.exports = {
+ 
+     common.setupSocket(socket);
+ 
+-    if (head && head.length) socket.unshift(head);
++    if (head && head.length){
++      // 如果要往Array的头部添加若干元素，使用unshift()方法，shift()方法则把Array的第一个元素删掉
++      socket.unshift(head);
++    }
+ 
+ 
++    // 创建代理请求
+     var proxyReq = (common.isSSL.test(options.target.protocol) ? https : http).request(
+       common.setupOutgoing(options.ssl || {}, options, req)
+     );
+@@ -111,6 +118,7 @@ module.exports = {
+     proxyReq.on('error', onOutgoingError);
+     proxyReq.on('response', function (res) {
+       // if upgrade event isn't going to happen, close the socket
++      // 属性响应到客户端
+       if (!res.upgrade) {
+         socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
+         res.pipe(socket);
+@@ -118,7 +126,18 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
 -      proxySocket.on('error', onOutgoingError);
 +      // yl 目标服务断开的监听
 +      proxySocket.on('error', onOutgoingError2);
++      // proxySocket.on('error',function(err) {
++      //   if (clb) {
++      //     clb(err, req, socket);
++      //   } else {
++      //     // yltodo待测试
++      //     // proxySocket.resetAndDestroy(); // 直接摧毁socket
++      //     // proxySocket.end(); // 猜测会走四次挥手过程。理解：目标服务断开连接时，应该不用再次主动关闭proxySocket。看之前的源码，目标服务报"error"时，会socket.end();客户端socket报 "error"时，会proxySocket.end()
++      //     server.emit('connectOtherNode', proxyReq, req, socket, options, head);
++      //   }
++      // });
  
        // Allow us to listen when the websocket has completed
        proxySocket.on('end', function () {
-@@ -140,12 +144,20 @@ module.exports = {
+@@ -134,18 +153,29 @@ module.exports = {
+ 
+       common.setupSocket(proxySocket);
+ 
+-      if (proxyHead && proxyHead.length) proxySocket.unshift(proxyHead);
++      if (proxyHead && proxyHead.length){
++        proxySocket.unshift(proxyHead);
++      }
+ 
+       //
        // Remark: Handle writing the headers to the socket when switching protocols
        // Also handles when a header is an array
        //
 -      socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers));
 +      var parseObj = url.parse(req.url,true);
++      // yl 通过传参控制
 +      if(!mm.mm.get(parseObj.query.a1)){
 +        socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers)); // yltodo 二次执行时不知道为何报错
 +      }
@@ -61,7 +149,7 @@ index 270f23f..9a18e6b 100644
      });
  
      return proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
-@@ -158,5 +170,13 @@ module.exports = {
+@@ -158,5 +188,13 @@ module.exports = {
        }
        socket.end();
      }

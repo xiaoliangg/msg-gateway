@@ -102,7 +102,7 @@ server.on('upgrade', function (req, socket, head) {
         //获取第一个server
         var target = servers_send_ws.shift();
         //将第一个server放在末尾，以实现循环地指向不同进程
-        servers_send_ws.push(target)
+        servers_send_ws.push(target);
         //将HTTP请求传递给目标node进程
         proxy.ws(req, socket, head,{target: target });
     }else{
@@ -134,6 +134,14 @@ proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
     console.log('RAW proxyReqWs from the target', JSON.stringify(proxyReq.headers, true, 2));
 });
 
+//
+// Listen for the `open` event on `proxy`.
+//
+proxy.on('open', function (proxySocket) {
+    // listen for messages coming FROM the target here
+    proxySocket.on('data', hybiParseAndLogMessage);
+});
+
 proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
     var parseObj = url.parse(req.url,true);
     var result = mm.mm.get(parseObj.query.a1);
@@ -141,7 +149,7 @@ proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
     //获取第一个server
     var target = servers_send_ws.shift();
     //将第一个server放在末尾，以实现循环地指向不同进程
-    servers_send_ws.push(target)
+    servers_send_ws.push(target);
     //将HTTP请求传递给目标node进程
     proxy.ws(result.req, result.socket, result.head,{target: target });
 

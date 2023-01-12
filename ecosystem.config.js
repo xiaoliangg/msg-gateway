@@ -7,7 +7,7 @@ module.exports = {
     script: './index.js',
     // Options reference: https://pm2.io/doc/en/runtime/reference/ecosystem-file/
     args: 'one two',
-    instances: 2,
+    instances: 1,
     autorestart: false,
     watch: true,
     output: './server/logs/out.log', // 显示console.log
