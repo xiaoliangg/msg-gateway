@@ -29,7 +29,7 @@ var servers_send = [
     'http://localhost:8083',
 ];
 
-// 模拟消息发送服务的websocket链接
+// 模拟消息发送服务的websocket连接
 var servers_send_ws = [
     'http://localhost:15041',
     'http://localhost:15042',
@@ -104,15 +104,18 @@ server.on('upgrade', function (req, socket, head) {
         //将第一个server放在末尾，以实现循环地指向不同进程
         servers_send_ws.push(target);
         //将HTTP请求传递给目标node进程
-        proxy.ws(req, socket, head,{target: target });
+        proxy.ws(req, socket, head,{target: target,switchProtocols:true });
     }else{
         console.error("wrong ws host!!!!!")
     }
 });
 // 重点: 1、客户端断开重连。   2、某节点崩溃的场景。       技术点:客户端断开的监听，目标服务断开的监听。
-// 报警机制；  代理服务的平滑下线；    目标服务的主动平滑下线(重点)。 1.标记某个服务下线(页面配置) 2.代理服务将下线服务的长连接进行迁移。 技术点:代理服务迁移和目标服务的长连接
+// 报警机制；  代理服务的平滑下线；    目标服务的主动平滑下线(重点)。 1.标记某个服务下线(页面配置) 2.代理服务将下线服务的长连接进行迁移。 技术点:代理服务迁移目标服务的长连接
 // 重点: nginx reload机制：目标服务加减节点，更新代理服务的配置文件，无需重启。
 // 代理服务的集群无需实现!。
+
+// 上线接口:1、将新节点写入外部存储 2.从外部存储刷新nodejs缓存
+// 下线接口:1、更新外部存储节点状态为下线中，并刷新nodejs缓存 2.将该节点的所有目标服务的长连接，迁移到其他节点 3.更新外部存储节点状态为下线完成，并刷新nodejs缓存
 
 /*******************************事件测试***************************/
 //
@@ -126,7 +129,7 @@ proxy.on('error', function (err, req, res) {
     // }
 
     // res.end('Something went wrong. And we are reporting a custom error message.');
-    console('11111111');
+    console.log('11111111');
 
 });
 
@@ -139,19 +142,17 @@ proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
 //
 proxy.on('open', function (proxySocket) {
     // listen for messages coming FROM the target here
-    proxySocket.on('data', hybiParseAndLogMessage);
+    // proxySocket.on('data', hybiParseAndLogMessage);
+    console.log("proxy.on(open)")
 });
 
 proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
-    var parseObj = url.parse(req.url,true);
-    var result = mm.mm.get(parseObj.query.a1);
-
     //获取第一个server
     var target = servers_send_ws.shift();
     //将第一个server放在末尾，以实现循环地指向不同进程
     servers_send_ws.push(target);
     //将HTTP请求传递给目标node进程
-    proxy.ws(result.req, result.socket, result.head,{target: target });
+    proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols });
 
     console.log('111connectOtherNode11111111');
 });

@@ -1,8 +1,8 @@
 diff --git a/node_modules/http-proxy/lib/http-proxy/index.js b/node_modules/http-proxy/lib/http-proxy/index.js
-index 977a4b3..75a7811 100644
+index 977a4b3..373af47 100644
 --- a/node_modules/http-proxy/lib/http-proxy/index.js
 +++ b/node_modules/http-proxy/lib/http-proxy/index.js
-@@ -28,19 +28,24 @@ httpProxy.Server = ProxyServer;
+@@ -28,19 +28,25 @@ httpProxy.Server = ProxyServer;
  function createRightProxy(type) {
  
    return function(options) {
@@ -11,6 +11,7 @@ index 977a4b3..75a7811 100644
        var passes = (type === 'ws') ? this.wsPasses : this.webPasses,
 +          // yl https://stackoverflow.com/questions/2125714/explanation-of-slice-call-in-javascript
 +          // yl 效果:make arguments a real Array
++          // yl 理解:[].slice 指的是数组类的一个函数类型的变量slice。 arguments是一个数组。 method.call(Object) 等价于 Object.method()
            args = [].slice.call(arguments),
            cntr = args.length - 1,
            head, cbl;
@@ -28,7 +29,7 @@ index 977a4b3..75a7811 100644
        var requestOptions = options;
        if(
          !(args[cntr] instanceof Buffer) &&
-@@ -54,12 +59,13 @@ function createRightProxy(type) {
+@@ -54,12 +60,13 @@ function createRightProxy(type) {
          cntr--;
        }
  
@@ -53,20 +54,21 @@ index 0000000..6096c94
 +    mm: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..d4f26f2 100644
+index 270f23f..d365e39 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-@@ -1,6 +1,8 @@
+@@ -1,6 +1,9 @@
  var http   = require('http'),
      https  = require('https'),
 -    common = require('../common');
++    extend    = require('util')._extend,
 +    common = require('../common'),
 +    mm = require('./test22'),
 +    url = require('url');
  
  /*!
   * Array of passes.
-@@ -17,6 +19,7 @@ var http   = require('http'),
+@@ -17,6 +20,7 @@ var http   = require('http'),
  
  
  module.exports = {
@@ -74,7 +76,7 @@ index 270f23f..d4f26f2 100644
    /**
     * WebSocket requests must have the `GET` method and
     * the `upgrade:websocket` header
-@@ -97,9 +100,13 @@ module.exports = {
+@@ -97,9 +101,13 @@ module.exports = {
  
      common.setupSocket(socket);
  
@@ -89,7 +91,11 @@ index 270f23f..d4f26f2 100644
      var proxyReq = (common.isSSL.test(options.target.protocol) ? https : http).request(
        common.setupOutgoing(options.ssl || {}, options, req)
      );
-@@ -111,6 +118,7 @@ module.exports = {
+@@ -108,9 +116,11 @@ module.exports = {
+     if (server) { server.emit('proxyReqWs', proxyReq, req, socket, options, head); }
+ 
+     // Error Handler
++    // 向目标服务创建连接请求时失败
      proxyReq.on('error', onOutgoingError);
      proxyReq.on('response', function (res) {
        // if upgrade event isn't going to happen, close the socket
@@ -97,12 +103,13 @@ index 270f23f..d4f26f2 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,7 +126,18 @@ module.exports = {
+@@ -118,10 +128,25 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
 -      proxySocket.on('error', onOutgoingError);
 +      // yl 目标服务断开的监听
++      // 长连接建立完成后，目标服务异常断开
 +      proxySocket.on('error', onOutgoingError2);
 +      // proxySocket.on('error',function(err) {
 +      //   if (clb) {
@@ -116,8 +123,21 @@ index 270f23f..d4f26f2 100644
 +      // });
  
        // Allow us to listen when the websocket has completed
-       proxySocket.on('end', function () {
-@@ -134,18 +153,29 @@ module.exports = {
+-      proxySocket.on('end', function () {
++      proxySocket.on('end', function () { // 关闭测试用网页时,会进入此方法，客户端正常断开
++        // yltodo
++        var parseObj = url.parse(req.url,true);
++        mm.mm.delete(parseObj.query.a1);
+         server.emit('close', proxyRes, proxySocket, proxyHead);
+       });
+ 
+@@ -129,34 +154,58 @@ module.exports = {
+       // if it errors (eg, vanishes from the net and starts returning
+       // EHOSTUNREACH). We need to do that explicitly.
+       socket.on('error', function () {
++        // 长连接建立完成后，客户端侧异常断开
+         proxySocket.end();
+       });
  
        common.setupSocket(proxySocket);
  
@@ -132,10 +152,12 @@ index 270f23f..d4f26f2 100644
        //
 -      socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers));
 +      var parseObj = url.parse(req.url,true);
-+      // yl 通过传参控制
-+      if(!mm.mm.get(parseObj.query.a1)){
++      // yl 通过传参控制。迁移目标服务连接时，不需要再次写switch Protocols。 其他(首次连接时,首次连接不成功重试其他节点时)需要写switch Protocols
++      // if(!mm.mm.get(parseObj.query.a1)){
++      if(options.switchProtocols){
 +        socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers)); // yltodo 二次执行时不知道为何报错
 +      }
++      // }
  
 +      console.log('yl测试222');
        proxySocket.pipe(socket).pipe(proxySocket);
@@ -149,26 +171,26 @@ index 270f23f..d4f26f2 100644
      });
  
      return proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
-@@ -158,5 +188,13 @@ module.exports = {
-       }
-       socket.end();
-     }
+ 
++    // switchProtocols仍旧使用之前的值，可能对应客户端首次连接时失败(switchProtocols=true)；或已建立长连接后，目标服务异常断开时，再连接新节点时异常(switchProtocols=false)。
+     function onOutgoingError(err) {
+       if (clb) {
+         clb(err, req, socket);
+       } else {
+-        server.emit('error', err, req, socket);
++        server.emit('connectOtherNode', proxyReq, req, socket, options, head);
++      }
++      // socket.end();
++    }
 +
++    // 对应已建立长连接后，目标服务异常断开时，再连接新节点时异常(switchProtocols=false)
 +    function onOutgoingError2(err) {
 +      if (clb) {
 +        clb(err, req, socket);
 +      } else {
-+        server.emit('connectOtherNode', proxyReq, req, socket, options, head);
-+      }
-+    }
++        server.emit('connectOtherNode', proxyReq, req, socket, extend(options,{switchProtocols:false}), head);
+       }
+-      socket.end();
+     }
    }
  };
-diff --git a/node_modules/http-proxy/renovate.json b/node_modules/http-proxy/renovate.json
-index fc1d2aa..c8326a1 100644
---- a/node_modules/http-proxy/renovate.json
-+++ b/node_modules/http-proxy/renovate.json
-@@ -1,3 +1,4 @@
-+
- {
-   "platform": "github",
-   "autodiscover": false,
