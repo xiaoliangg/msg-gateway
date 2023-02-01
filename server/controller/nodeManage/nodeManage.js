@@ -1,6 +1,7 @@
 'use strict'
 
 // import { postRequest, getRequest} from '../../service/admin'
+var myRedis = require("../../redis/myredis");
 
 class Admin {
   /**
@@ -74,6 +75,11 @@ class Admin {
     const params = req.query
     // const result = await offlineRadio(data, params)
     const result = "express测试testyl"
+    myRedis.client.set("aamyRedis",result,function(err,result){
+      console.log(err);
+      console.log(result);
+      res.json(result)
+    })
     res.send({
       code: 10000,
       message: 'success',

@@ -5,6 +5,8 @@ const http = require('http');
 const url = require('url');
 const express = require('express')
 const path = require('path')
+var myRedis = require("./redis/myredis");
+
 import bodyParser from 'body-parser'
 const mm = require('http-proxy/lib/http-proxy/passes/test22');
 
@@ -101,6 +103,7 @@ var servers_send = [
     'http://localhost:8082',
     'http://localhost:8083',
 ];
+var servers_send = myRedis.client.get("servers_send");
 
 // 模拟消息发送服务的websocket连接
 var servers_send_ws = [
