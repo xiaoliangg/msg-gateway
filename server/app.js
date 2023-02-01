@@ -1,5 +1,11 @@
+import router from './routes/index'
+import timeout from 'connect-timeout'
+
 const http = require('http');
 const url = require('url');
+const express = require('express')
+const path = require('path')
+import bodyParser from 'body-parser'
 const mm = require('http-proxy/lib/http-proxy/passes/test22');
 
 // 只需创建一个 app.js 即可运行
@@ -9,18 +15,81 @@ const hostname = '127.0.0.1';
 const port = process.env.PORT | 3000
 const environment = process.env.NODE_ENV
 
-const server2 = http.createServer((req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'text/plain');
-    res.end('Hello World');
-});
+// 注释实例
+// const server2 = http.createServer((req, res) => {
+//     res.statusCode = 200;
+//     res.setHeader('Content-Type', 'text/plain');
+//     res.end('Hello World');
+// });
+//
+// server2.listen(port, hostname, () => {
+//     console.log(`Server running at http://${hostname}:${port}/`);
+//     // 当启用test 和 start时,输出的环境不一样，测试通过
+//     console.log(`Server running environment: ${environment}/`);
+// });
 
-server2.listen(port, hostname, () => {
-    console.log(`Server running at http://${hostname}:${port}/`);
-    // 当启用test 和 start时,输出的环境不一样，测试通过
-    console.log(`Server running environment: ${environment}/`);
-});
 
+/********************express*******************/
+const app = express()
+
+// 超时时间
+const TIME_OUT = 300 * 1e3
+// 设置超时 返回超时响应
+app.use(timeout(TIME_OUT))
+app.use((req, res, next) => {
+    if (!req.timedout) next()
+})
+
+// 开启gzip
+// app.use(compression())
+
+/**
+ * 默认体验demo登录
+ */
+app.all('*', async (req, res, next) => {
+    // 响应开始时间
+    const start = new Date()
+    // 响应间隔时间
+    var ms
+    ms = new Date() - start
+    try {
+        // 开始进入到下一个中间件
+        await next()
+        // 记录响应日志
+        if (process.env.NODE_ENV === 'production') {
+            log.i(req, ms)
+        }
+    } catch (error) {
+        // 记录异常日志
+        if (process.env.NODE_ENV === 'production') {
+            log.e(req, error, ms)
+        }
+    }
+    console.log(`${req.method} ${req.url} - ${ms}ms-${res.statusCode}`)
+})
+
+// view engine setup
+app.set('views', path.join(__dirname, 'views'))
+app.set('view engine', 'ejs')
+
+// 设置浏览器可以直接访问的静态文件目录
+app.use(express.static(path.join(__dirname, 'public')))
+app.use(express.static(path.join(__dirname, 'statics')))
+
+app.use(bodyParser.json()) // for parsing application/json
+app.use(bodyParser.urlencoded({ extended: true }))
+
+router(app)
+
+app.get('/', function (req, res) {
+    // 首页推送静态页面
+    res.sendFile(path.join(__dirname, 'public/index.html'))
+})
+
+// 监听服务
+app.listen(port, function () {
+    console.log(`Example app listening on port ${port}!`)
+})
 
 // 模拟消息发送服务的http短链接
 var servers_send = [
