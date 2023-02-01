@@ -91,6 +91,10 @@ app.listen(port, function () {
     console.log(`Example app listening on port ${port}!`)
 })
 
+
+
+
+
 // 模拟消息发送服务的http短链接
 var servers_send = [
     'http://localhost:8081',
