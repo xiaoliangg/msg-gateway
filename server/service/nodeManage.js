@@ -15,6 +15,10 @@ export const queryOnlineNode = data => {
       onlineNodeResult.forEach(e =>{
         arr.push(e.value);
       })
+      if(!arr.length) {
+        resolve(finalyResult);
+        return;
+      }
       nodeValues = myRedis.client.mGet(arr);
       nodeValues.then(nodeValueResult =>{
         nodeValueResult.forEach(function (element, index, array) {
@@ -40,7 +44,7 @@ export const queryOnlineNode = data => {
   })
 }
 
-export const saveData = data => {
+export const saveNode = data => {
   var map = [];
   var id;
   data.data.forEach(item => {
@@ -52,11 +56,19 @@ export const saveData = data => {
   })
 
   return new Promise((resolve, reject) => {
+    if(!map.length){
+      return resolve();
+    }
     myRedis.client.multi().mSet(map).exec();
-    myRedis.client.multi().zAdd(data.server,data.data,function(err,result){
-      console.log(err);
-      console.log(result);
-      if(err) reject(err)
-    }).exec();
+    myRedis.client.multi().zAdd(data.server,data.data).exec();
+    resolve();
+  })
+}
+
+export const deleteNode = data => {
+  return new Promise((resolve, reject) => {
+    myRedis.client.del(data.id);
+    myRedis.client.zRem(data.server,data.id);
+    resolve();
   })
 }

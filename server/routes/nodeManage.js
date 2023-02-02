@@ -15,7 +15,7 @@ const router = express.Router()
 // router.post('/delete', NodeManage.deleteNode)
 
 // 手动下线节点
-router.get('/offlineNode', NodeManage.offlineNode)
+router.post('/offlineNode', NodeManage.offlineNode)
 
 // 手动上线节点
 router.post('/onlineNode', NodeManage.onlineNode)
