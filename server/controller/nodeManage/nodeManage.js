@@ -1,5 +1,11 @@
 'use strict'
 
+import {
+  queryOnlineNode,
+  saveData,
+  // getTotalDataTypeMonth3
+} from '../../service/nodeManage'
+
 // import { postRequest, getRequest} from '../../service/admin'
 var myRedis = require("../../redis/myredis");
 
@@ -63,7 +69,7 @@ class Admin {
   // }
 
   /**
-   *暂停电台
+   *下线节点
    *method post
    * @param {*} req
    * @param {*} res
@@ -88,7 +94,7 @@ class Admin {
   }
 
   /**
-   *启用电台
+   *上线节点
    *method post
    * @param {*} req
    * @param {*} res
@@ -98,22 +104,76 @@ class Admin {
   async onlineNode (req, res, next) {
     const data = req.body
     const params = req.query
-    let result = null
-    try {
-      result = await onlineRadio(data, params)
-      if (result.code === 10000 || result.code === 200) {
-        res.send(result)
-      } else {
-        res.send(aiRadioRes)
-      }
-    } catch (err) {
-      res.send({
-        code: 11005,
-        success: false,
-        message: err.message,
+
+    // todo 查询有序集合 对请求去重，已存在的服务不再重新添加
+    // todo uuid表示服务唯一标识
+    queryOnlineNode(data).then(result => {
+      let successData = {
+        code: 10000,
+        message: 'success',
         result: result
+      }
+      // 根据查询result对请求data过滤
+      console.log(result)
+      let nodeValues = result.map(obj => {return obj.value})
+      data.data = data.data.filter(function (x) {
+        return nodeValues.indexOf(x.value)<0;
+      });
+      saveData(data).then(result => {
+        let successData = {
+          code: 10000,
+          message: 'success',
+          result: result
+        }
+        res.send(successData)
+      }).catch(err => {
+        let errData = {
+          code: 10014,
+          message: '服务器异常，请重新操作',
+          result: err
+        }
+        res.send(errData)
       })
-    }
+
+      // res.send(successData)
+    }).catch(err => {
+      let errData = {
+        code: 10014,
+        message: '服务器异常，请重新操作',
+        result: err
+      }
+      res.send(errData)
+    })
+  }
+
+  /**
+   *查询节点
+   *method post
+   * @param {*} req
+   * @param {*} res
+   * @param {*} next
+   * @memberof Admin
+   */
+  async queryOnlineNode (req, res, next) {
+    const data = req.body
+    const params = req.query
+    queryOnlineNode(params).then(result => {
+      let successData = {
+        code: 10000,
+        message: 'success',
+        result: result
+      }
+      // 根据查询result对请求data过滤
+      console.log(result)
+      res.send(successData)
+    }).catch(err => {
+      let errData = {
+        code: 10014,
+        message: '服务器异常，请重新操作',
+        result: err
+      }
+      res.send(errData)
+    })
   }
 }
 

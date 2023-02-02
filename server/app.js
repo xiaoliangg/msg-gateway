@@ -103,7 +103,6 @@ var servers_send = [
     'http://localhost:8082',
     'http://localhost:8083',
 ];
-var servers_send = myRedis.client.get("servers_send");
 
 // 模拟消息发送服务的websocket连接
 var servers_send_ws = [
@@ -175,12 +174,17 @@ server.on('upgrade', function (req, socket, head) {
         console.log(parseObj);
         // 解析参数成功 todo:根据用户id查找或注册消息发送服务节点
         console.log(parseObj.query.a1);
-        //获取第一个server
-        var target = servers_send_ws.shift();
-        //将第一个server放在末尾，以实现循环地指向不同进程
-        servers_send_ws.push(target);
-        //将HTTP请求传递给目标node进程
-        proxy.ws(req, socket, head,{target: target,switchProtocols:true });
+        var target;
+        var ss = client.zRange('servers_send_zAdd', 0,0);
+        ss.then(aa =>{
+            target = aa[0];
+        });
+        if(target){
+            //将HTTP请求传递给目标node进程
+            proxy.ws(req, socket, head,{target: target,switchProtocols:true });
+        }else{
+            console.error("没有可用的服务!!!!!")
+        }
     }else{
         console.error("wrong ws host!!!!!")
     }
