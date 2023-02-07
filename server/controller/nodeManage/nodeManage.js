@@ -8,7 +8,6 @@ import {
 } from '../../service/nodeManage'
 
 // import { postRequest, getRequest} from '../../service/admin'
-var myRedis = require("../../redis/myredis");
 
 class Admin {
   /**

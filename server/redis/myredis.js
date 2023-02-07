@@ -27,7 +27,10 @@ mResult.then(r =>{
     console.log("r:" + r)
 })
 client.set('servers_send_test','http://localhost:8081');
-
+client.get('servers_send_test').then(aa =>{
+    var getResult = aa;
+    console.log(getResult)
+});
 
 client.hSet('servers_send_hSet', 'field1', 'value1');
 client.rPush('servers_send_push','http://localhost:8081');
