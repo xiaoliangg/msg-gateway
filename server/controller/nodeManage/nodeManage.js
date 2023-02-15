@@ -108,8 +108,8 @@ class Admin {
     const data = req.body
     const params = req.query
 
-    // todo 查询有序集合 对请求去重，已存在的服务不再重新添加
-    // todo uuid表示服务唯一标识
+    // 查询有序集合 对请求去重，已存在的服务不再重新添加
+    // uuid表示服务唯一标识
     queryOnlineNode(data).then(result => {
       // let successData = {
       //   code: 10000,
