@@ -1,10 +1,24 @@
 import router from './routes/index'
 import timeout from 'connect-timeout'
+import {
+    addLongConnect,
+    deleteLongConnect
+} from './service/LongConnectManage'
+import {
+    addFailNodes,
+    clearFailNodes,
+    queryFailNodes,
+    incrNodeFailTimes,
+    clearNodeFailTimes, startDeleteNode
+} from './service/nodeManage'
+import {
+    BreakError
+} from './error/error'
 
 const http = require('http');
 const url = require('url');
-const express = require('express')
-const path = require('path')
+const express = require('express');
+const path = require('path');
 var myRedis = require("./redis/myredis");
 
 import bodyParser from 'body-parser'
@@ -105,11 +119,11 @@ var servers_send = [
 ];
 
 // 模拟消息发送服务的websocket连接
-var servers_send_ws = [
-    'http://localhost:15041',
-    'http://localhost:15042',
-    // 'http://localhost:15043',
-];
+// var servers_send_ws = [
+//     'http://localhost:15041',
+//     'http://localhost:15042',
+//     // 'http://localhost:15043',
+// ];
 
 // 模拟消息分发服务的http短连接
 var servers_dispatch = [
@@ -130,20 +144,18 @@ var server = http.createServer(function(req, res) {
     // and then proxy the request.
     console.log(req);
     console.log(req.method);
-    // 可以打出参数来。 todo:解析url的第一位来确定当前服务
+    // 可以打出参数来。 解析url的第一位来确定当前服务
     console.log(req.url);
     var parseObj = url.parse(req.url,true);
     console.log(parseObj);
-    // 解析参数成功 todo:根据用户id查找或注册消息发送服务节点
-    console.log(parseObj.query.a1);
+    // 解析参数成功 根据用户id查找或注册消息发送服务节点
+    console.log(parseObj.query.uid);
 
     console.log(req.headers);
     console.log(req.headers.host);
 
 
-    // if(req.url.indexOf("msgSend") > -1){
-    // todo: 注意忽略大小写
-    if(req.headers.host.indexOf("oms.msgdispatch.com") > -1){
+    if(req.headers.host.toLowerCase().indexOf("oms.msgdispatch.com") > -1){
         console.log("msgdispatch!!!!!")
         //获取第一个server
         var target = servers_dispatch.shift();
@@ -151,7 +163,7 @@ var server = http.createServer(function(req, res) {
         proxy.web(req,res,{target: target });
         //将第一个server放在末尾，以实现循环地指向不同进程
         servers_dispatch.push(target);
-    }else if(req.headers.host.indexOf("oms.msgsend.com") > -1){
+    }else if(req.headers.host.toLowerCase().indexOf("oms.msgsend.com") > -1){
         console.log("msgsend!!!!!")
         //获取第一个server
         var target = servers_send.shift();
@@ -167,21 +179,29 @@ var server = http.createServer(function(req, res) {
 
 server.on('upgrade', function (req, socket, head) {
     // ws请求会走此逻辑
-    if(req.headers.host.indexOf("oms.msglongconnect.com") > -1){
+    if(req.headers.host.toLowerCase().indexOf("oms.msglongconnect.com") > -1){
         // 通过域名区分是否长连接，此域名是websocket代理
         console.log("msglongconnect2!!!!!")
         var parseObj = url.parse(req.url,true);
         console.log(parseObj);
-        // 解析参数成功 todo:根据用户id查找或注册消息发送服务节点
-        console.log(parseObj.query.a1);
+        // 解析参数成功 根据用户id查找或注册消息发送服务节点
+        console.log(parseObj.query.uid);
+        // 获取节点
+        var nid;
         var target;
-        var ss = client.zRange('servers_send_zAdd', 0,0);
+        var ss = myRedis.client.zRange('servers_send_ws', 0,0);
         ss.then(aa =>{
-            target = aa[0];
+            nid = aa[0];
         });
+        client.get(nid).then(aa =>{
+            target = aa;
+        })
+        // 新增长连接
+        addLongConnect({"server":"servers_send_ws","nid":nid,"uid":parseObj.query.uid})
+
         if(target){
             //将HTTP请求传递给目标node进程
-            proxy.ws(req, socket, head,{target: target,switchProtocols:true });
+            proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
         }else{
             console.error("没有可用的服务!!!!!")
         }
@@ -216,15 +236,8 @@ server.on('upgrade', function (req, socket, head) {
 // Listen for the `error` event on `proxy`.
 // 貌似对应服务器断开
 proxy.on('error', function (err, req, res) {
-    // if(res.functions.indexOf("writeHead" > -1)){
-    //     res.writeHead(500, {
-    //         'Content-Type': 'text/plain'
-    //     });
-    // }
-
     // res.end('Something went wrong. And we are reporting a custom error message.');
     console.log('11111111');
-
 });
 
 proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
@@ -241,13 +254,57 @@ proxy.on('open', function (proxySocket) {
 });
 
 proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
-    //获取第一个server
-    var target = servers_send_ws.shift();
-    //将第一个server放在末尾，以实现循环地指向不同进程
-    servers_send_ws.push(target);
-    //将HTTP请求传递给目标node进程
-    proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols });
+    var parseObj = url.parse(req.url,true);
 
+    var nid = null;
+    var target;
+    var failNodes;
+    var nodeFailTimes;
+    var allNodes;
+    // 不再使用刚刚失败的节点。轮询其他节点，而不是使用最小连接数的节点。
+    // 加入该用户的失败服务集合，并返回最新失败服务集合
+    if(options.nid){
+        addFailNodes({uid:parseObj.query.uid,nid:options.nid})
+        // todo 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
+        nodeFailTimes = incrNodeFailTimes({nid:options.nid})
+        if(nodeFailTimes > 20){
+            // todo 开启自动下线流程
+            startDeleteNode({nid:data.nid,mode:'auto'}).then(result => {
+                console.log("auto delete node success");
+            }).catch(err => {
+                console.error(err)
+            })
+        }
+    }
+    failNodes = queryFailNodes({uid:parseObj.query.uid})
+
+    var allNodes = myRedis.client.zRange('servers_send_ws', 0,50);
+    try {
+        allNodes.then(allNodes2 =>{
+            allNodes2.forEach(node => {
+                if(nid) throw BreakError;
+                if(!failNodes.contains(node)){
+                    nid = node;
+                }
+            })
+
+
+        });
+    } catch(e) {
+        if (e!==BreakError) console.log("跳出循环,nid:" + nid);
+    }
+
+    target = myRedis.client.get(nid)
+    if(target){
+        // 删除失败nid与uid的关联
+        deleteLongConnect({"server":"servers_send_ws","nid":options.nid,"uid":parseObj.query.uid})
+        // 为新的nid与uid建立关联
+        addLongConnect({"server":"servers_send_ws","nid":nid,"uid":parseObj.query.uid})
+        //将HTTP请求传递给目标node进程
+        proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
+    }else{
+        console.error("没有可用的服务!!!!!")
+    }
     console.log('111connectOtherNode11111111');
 });
 

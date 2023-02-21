@@ -18,6 +18,7 @@ var client = redis.createClient({
 client.on('connect', () => console.log('Connected to Redis') )
 client.connect();
 
+var r = client.incr('node_fail_times');
 
 client.set('servers_send_test','http://localhost:8081');
 // client.mSet([{'serversmset1':'v1'},{'serversmset2':'v2'}]);
