@@ -50,7 +50,7 @@ export const saveNode = async data => {
 }
 
 /**
- * 心跳检测
+ * 心跳检测 每隔 interval 检测url是否可达，直到检测成功或超时
  * @param url
  * @param interval 时间间隔,单位s
  * @param timeout 超时时间,单位s
