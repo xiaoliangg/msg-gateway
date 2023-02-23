@@ -6,6 +6,7 @@
   "scripts": {
     "test": "pm2 start ecosystem.config.js --env development",
     "dev:debug": "cross-env NODE_ENV=development node --inspect=9100 index.js",
+    "dev:nodemon": "cross-env NODE_ENV=development nodemon --inspect=9100 index.js",
     "start": "pm2 start ecosystem.config.js --env production",
     "stop": "pm2 stop index.js",
     "restart": "pm2 reload index.js --node-args='--harmony'",
@@ -16,7 +17,8 @@
     "express": "^4.18.2",
     "md5": "^2.2.1",
     "patch-package": "^6.5.1",
-    "redis": "^4.6.4"
+    "redis": "^4.6.4",
+    "url-exist": "^2.0.2"
   },
   "devDependencies": {
     "babel-core": "^6.22.1",

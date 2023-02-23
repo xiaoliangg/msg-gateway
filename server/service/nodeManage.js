@@ -1,129 +1,188 @@
+'use strict'
+
 var myRedis = require("../redis/myredis");
 const crypto = require('crypto');
-
-export const queryOnlineNode = data => {
-  let arr = [];
-  var finalyResult = [];
-  var onlineNodes;
-  var nodeValues;
-  return new Promise((resolve, reject) => {
-    // 不带score的结果
-    // onlineNodes = myRedis.client.zRange(data.server, 0,50)
-    // 带score的结果
-    onlineNodes = myRedis.client.zRangeWithScores(data.server,0,50)
-    onlineNodes.then(onlineNodeResult =>{
-      onlineNodeResult.forEach(e =>{
-        arr.push(e.value);
-      })
-      if(!arr.length) {
-        resolve(finalyResult);
-        return;
-      }
-      nodeValues = myRedis.client.mGet(arr);
-      nodeValues.then(nodeValueResult =>{
-        nodeValueResult.forEach(function (element, index, array) {
-          // element: 指向当前元素的值
-          // index: 指向当前索引
-          if(element){
-            finalyResult.push({"value":element,"score":onlineNodeResult[index].score,"id":onlineNodeResult[index].value})
-          }
-        });
-        resolve(finalyResult)
-      })
-    }).catch (err =>{
-      reject(err)
-    })
-
-    // 卡死
-    // myRedis.client.zRange("servers_ws",0,0,function(err,result){
-    //   console.log(err);
-    //   console.log(result);
-    //   if(err) reject(err)
-    //   resolve(result)
-    // })
-  })
-}
+import * as CONST from '../service/CONST'
+import {initDispatchServer} from '../app'
+var urlExist = require('url-exist');
 
 /**
  * 上线节点
  * @param data
  * @returns {Promise<unknown>}
  */
-export const saveNode = data => {
-  var map = [];
-  var nid;
-  data.data.forEach(item => {
-    item.score = 0;
-    nid = data.server + "_" + crypto.randomUUID();
-    map.push(nid);
-    map.push(item.value);
-    item.value = nid;
-  })
+export const saveNode = async data => {
+  if(data.server === CONST.SERVERS_SEND){
+    // todo 校验如果上线节点在下线中，抛出异常
+    // var errRes = validateDowning(data);
+    // if(errRes) throw errRes;
 
-  return new Promise((resolve, reject) => {
+    let map = [];
+    let nid;
+    data.data.forEach(item => {
+      item.score = 0;
+      nid = crypto.randomUUID();
+      map.push(CONST.SERVERS_SEND_WS(nid));
+      map.push(item.ws);
+      map.push(CONST.SERVERS_SEND_HTTP(nid));
+      map.push(item.http);
+      item.value = nid;
+    })
+
     if(!map.length){
       return resolve();
     }
-    myRedis.client.multi().mSet(map).exec();
-    myRedis.client.multi().zAdd(data.server,data.data).exec();
-    resolve();
-  })
-}
-var servers_send_ws_auto_downing = 'servers_send_ws_auto_downing'
-var servers_send_ws_manual_downing = 'servers_send_ws_manual_downing'
-// 开始下线节点
-export const startDeleteNode = data => {
-  return new Promise((resolve, reject) => {
-    // todo 下线节点不删除，删除节点时再进行删除
-    // myRedis.client.del(data.nid);
-    myRedis.client.zRem(data.server,data.nid);
-    // 移入下线中的节点集合
-    if(data.mode === 'auto'){
-      myRedis.client.rPush(servers_send_ws_auto_downing,data.nid);
-    }else{
-      myRedis.client.rPush(servers_send_ws_manual_downing,data.nid);
+    await myRedis.client.multi().mSet(map).exec();
+    await myRedis.client.multi().zAdd(CONST.SERVERS_SEND,data.data).exec();
+  }else if(data.server === CONST.SERVERS_DISPATCH){
+    let arr = [];
+    data.data.forEach(item => {
+      arr.push(item.http);
+    })
+    if(arr.length != 0){
+      await myRedis.client.multi().sAdd(CONST.SERVERS_DISPATCH, arr).exec();
+      await myRedis.client.multi().sRem(CONST.SERVERS_DISPATCH_DOWN,arr).exec();
+      await initDispatchServer();
     }
-    // todo 开启下线流程
-    startOfflineNode().then(result => {
+  }else{
+    throw "不支持的服务6"
+  }
+}
+
+/**
+ * 心跳检测
+ * @param url
+ * @param interval 时间间隔,单位s
+ * @param timeout 超时时间,单位s
+ * @returns {Promise<Promise<unknown> extends PromiseLike<infer U> ? U : Promise<unknown>>}
+ */
+async function heartCheck(url,interval,timeout) {
+  var timeoutId = null;
+  var intervalId = null;
+  var p1 = new Promise((resolve,reject) =>{
+    const check = async (url) => {
+      console.log(`url心跳检测检测:${url}`)
+      const exists = await urlExist(url);
+      if(exists){
+        if(intervalId) {
+          console.log(`${url}可达,清除定时器`)
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+        if(timeoutId){
+          console.log(`${url}可达,清除超时`)
+          clearTimeout(timeoutId);
+        }
+        console.log(`${url}可达,返回true`)
+        resolve(true)
+      }
+    };
+    intervalId = setInterval(check, interval*1000,url);
+  })
+
+  var p2 = new Promise((resolve,reject) =>{
+    const fn2 = () => {
+      if(intervalId) {
+        console.log(`${url}检测超时,清除定时器并返回false`)
+        clearInterval(intervalId);
+        resolve(false)
+      }
+    };
+    timeoutId = setTimeout(fn2,timeout*1000);
+  })
+  return Promise.race([p1,p2]);
+}
+
+// 开始下线节点
+export const startDeleteNode = async data => {
+  await myRedis.client.zRem(data.server,data.nid);
+  // 移入下线中的节点集合
+  if(data.mode === 'auto'){
+    // 心跳检测ws地址。30min  每分钟check一次，超过30min后，下线。
+    var ws = await myRedis.client.get(CONST.SERVERS_SEND_WS(nid))
+    var success = await heartCheck(ws,60,60*30);
+    if(success){
+      // 如果30min内成功,重新加入在线集合
+      await myRedis.client.zAdd(data.server,data.nid);
+    }else{
+      // 超过30min后，下线
+      await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_AUTO_DOWNING,data.nid);
+      startOfflineNode(data.nid).then(result => {
+        console.log("下线成功");
+        deleteNodeFinish({'mode':'auto',nid:result.nid})
+      }).catch(err => {
+        console.error("下线失败")
+      })
+    }
+  }else{
+    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_MANUAL_DOWNING,data.nid);
+    startOfflineNode(data.nid).then(result => {
       console.log("下线成功");
-      // deleteNodeFinish({nid:result.nid})
+      deleteNodeFinish({'mode':'manual',nid:result.nid})
     }).catch(err => {
       console.error("下线失败")
     })
-    resolve();
-  })
+  }
 }
 
-var servers_send_ws_auto_down = 'servers_send_ws_auto_down'
-var servers_send_ws_manual_down = 'servers_send_ws_manual_down'
 // 下线节点完成
-export const deleteNodeFinish = data => {
-  return new Promise((resolve, reject) => {
-    // todo 移出下线中的节点集合；移入已下线节点集合；
-    if(data.mode === 'auto'){
-      //todo 可能不成功
-      // myRedis.client.lPop(servers_send_ws_auto_downing);
-      myRedis.client.sAdd(servers_send_ws_auto_down,data.uid);
+export const deleteNodeFinish = async data => {
+  var ws = await myRedis.client.getDel(CONST.SERVERS_SEND_WS(data.nid))
+  var http = await myRedis.client.getDel(CONST.SERVERS_SEND_HTTP(data.nid))
+  if(data.mode === 'auto'){
+    await myRedis.client.sRem(CONST.SERVERS_SEND_WS_AUTO_DOWNING,data.nid);
+    // 查询ws地址和http地址
+    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_AUTO_DOWN,{"ws":ws,"http":http});
+  }else{
+    await myRedis.client.sRem(CONST.SERVERS_SEND_WS_MANUAL_DOWNING,data.nid);
+    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_MANUAL_DOWN,{"ws":ws,"http":http});
+  }
+}
 
-    }else{
-      // myRedis.client.lPop(servers_send_ws_manual_downing);
-      myRedis.client.sAdd(servers_send_ws_manual_down,data.uid);
-    }
-    // 如果是自动下线，移入自动下线集合
+/**
+ * 下线分发服务的节点
+ * @param data
+ * @returns {Promise<unknown>}
+ */
+export const deleteDispatchServer = async data => {
+  return new Promise((resolve, reject) => {
+    myRedis.client.sRem(CONST.SERVERS_DISPATCH,data.http);
+    myRedis.client.sAdd(CONST.SERVERS_DISPATCH_DOWN,data.http);
+    initDispatchServer();
     resolve();
   })
 }
 
 
-var failed_nodes = "failed_nids"
+export const queryOnlineNode = async server => {
+  var finalyResult = [];
+  var onlineNodes;
+  var nodeWsValue;
+  var nodeHttpValue;
+
+  if(server === CONST.SERVERS_SEND){
+    onlineNodes = await myRedis.client.zRangeWithScores(server,0,50);
+    onlineNodes.forEach(async node =>{
+      nodeWsValue = await myRedis.client.get(CONST.SERVERS_SEND_WS(node.value));
+      nodeHttpValue = await myRedis.client.get(CONST.SERVERS_SEND_HTTP(node.value));
+      finalyResult.push({"ws":nodeWsValue,"http":nodeHttpValue,"score":node.score,"id":node.value})
+    })
+    return Promise.resolve(finalyResult);
+  }else if(server === CONST.SERVERS_DISPATCH){
+    return await myRedis.client.sMembers(CONST.SERVERS_DISPATCH);
+  }else{
+    throw "未知的server";
+  }
+}
+
 /**
  * 添加用户的失败过节点
  * @param data
  * @returns {Promise<unknown>}
  */
-export const addFailNodes = data => {
+export const addFailNodes = async data => {
   return new Promise((resolve, reject) => {
-    myRedis.client.sAdd(failed_nodes + ":" + data.uid,data.nid);
+    myRedis.client.sAdd(CONST.FAILED_NODES(data.uid),data.nid);
     resolve();
   })
 }
@@ -132,9 +191,9 @@ export const addFailNodes = data => {
  * @param data
  * @returns {Promise<unknown>}
  */
-export const clearFailNodes = data => {
+export const clearFailNodes = async data => {
   return new Promise((resolve, reject) => {
-    myRedis.client.del(failed_nodes + ":" + data.uid);
+    myRedis.client.del(CONST.FAILED_NODES(data.uid));
     resolve();
   })
 }
@@ -144,10 +203,10 @@ export const clearFailNodes = data => {
  * @param data
  * @returns {Promise<unknown>}
  */
-export const queryFailNodes = data => {
+export const queryFailNodes = async data => {
   var failNodes;
   return new Promise((resolve, reject) => {
-    failNodes = myRedis.client.sMembers(failed_nodes + ":" + data.uid)
+    failNodes = myRedis.client.sMembers(CONST.FAILED_NODES(data.uid))
     failNodes.then(aa =>{
       resolve(aa);
     }).catch (err =>{
@@ -156,15 +215,14 @@ export const queryFailNodes = data => {
   })
 }
 
-var node_fail_times = 'node_fail_times'
 /**
  * 节点的连续失败次数+1
  * @param data
  * @returns {Promise<unknown>}
  */
-export const incrNodeFailTimes = data => {
+export const incrNodeFailTimes = async data => {
   return new Promise((resolve, reject) => {
-    var r = myRedis.client.incr(node_fail_times + ":" + data.nid);
+    var r = myRedis.client.incr(CONST.NODE_FAIL_TIMES(data.uid));
     resolve(r);
   })
 }
@@ -173,9 +231,9 @@ export const incrNodeFailTimes = data => {
  * @param data
  * @returns {Promise<unknown>}
  */
-export const clearNodeFailTimes = data => {
+export const clearNodeFailTimes = async data => {
   return new Promise((resolve, reject) => {
-    myRedis.client.del(node_fail_times + ":" + data.uid);
+    myRedis.client.del(CONST.NODE_FAIL_TIMES(data.uid));
     resolve();
   })
 }
