@@ -1,5 +1,3 @@
-import {deleteLongConnect, queryAllUidsByNid} from "./LongConnectManage";
-
 var myRedis = require("../redis/myredis");
 const crypto = require('crypto');
 const mm = require('http-proxy/lib/http-proxy/passes/test22');
