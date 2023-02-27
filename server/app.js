@@ -23,7 +23,6 @@ var myRedis = require("./redis/myredis");
 
 import bodyParser from 'body-parser'
 import * as CONST from "./service/CONST";
-const mm = require('http-proxy/lib/http-proxy/passes/test22');
 
 // 只需创建一个 app.js 即可运行
 // 参考:https://nodejs.org/en/docs/guides/getting-started-guide/
@@ -233,7 +232,7 @@ proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
 proxy.on('open', function (proxySocket) {
     // listen for messages coming FROM the target here
     // proxySocket.on('data', hybiParseAndLogMessage);
-    console.log("proxy.on(open)")
+    console.log("proxy.on(open)111")
 });
 
 proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {

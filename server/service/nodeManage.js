@@ -181,10 +181,8 @@ export const queryOnlineNode = async server => {
  * @returns {Promise<unknown>}
  */
 export const addFailNodes = async data => {
-  return new Promise((resolve, reject) => {
-    myRedis.client.sAdd(CONST.FAILED_NODES(data.uid),data.nid);
-    resolve();
-  })
+  return await myRedis.client.sAdd(CONST.FAILED_NODES(data.uid),data.nid);
+
 }
 /**
  * 清空用户的失败节点集合
@@ -192,10 +190,8 @@ export const addFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearFailNodes = async data => {
-  return new Promise((resolve, reject) => {
-    myRedis.client.del(CONST.FAILED_NODES(data.uid));
-    resolve();
-  })
+  return await myRedis.client.del(CONST.FAILED_NODES(data.uid));
+
 }
 
 /**
@@ -204,15 +200,7 @@ export const clearFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const queryFailNodes = async data => {
-  var failNodes;
-  return new Promise((resolve, reject) => {
-    failNodes = myRedis.client.sMembers(CONST.FAILED_NODES(data.uid))
-    failNodes.then(aa =>{
-      resolve(aa);
-    }).catch (err =>{
-      reject(err)
-    })
-  })
+  return await myRedis.client.sMembers(CONST.FAILED_NODES(data.uid))
 }
 
 /**
@@ -221,10 +209,7 @@ export const queryFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const incrNodeFailTimes = async data => {
-  return new Promise((resolve, reject) => {
-    var r = myRedis.client.incr(CONST.NODE_FAIL_TIMES(data.uid));
-    resolve(r);
-  })
+  return await myRedis.client.incr(CONST.NODE_FAIL_TIMES(data.uid));
 }
 /**
  * 节点的连续失败次数重置为0
@@ -232,8 +217,5 @@ export const incrNodeFailTimes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearNodeFailTimes = async data => {
-  return new Promise((resolve, reject) => {
-    myRedis.client.del(CONST.NODE_FAIL_TIMES(data.uid));
-    resolve();
-  })
+  await myRedis.client.del(CONST.NODE_FAIL_TIMES(data.uid));
 }
