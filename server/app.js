@@ -229,13 +229,15 @@ proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
 //
 // Listen for the `open` event on `proxy`.
 //
-proxy.on('open', function (proxySocket) {
+proxy.on('open', function (proxySocket,uid,nid) {
     // listen for messages coming FROM the target here
     // proxySocket.on('data', hybiParseAndLogMessage);
-    console.log("proxy.on(open)111")
+    console.log(`long connect success,nid:${nid},uid:${uid}`)
+    clearFailNodes({"uid":uid});
+    clearNodeFailTimes({"nid":nid});
 });
 
-proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
+proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head) {
     var parseObj = url.parse(req.url,true);
 
     var nid = null;
@@ -246,42 +248,38 @@ proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
     // 不再使用刚刚失败的节点。轮询其他节点，而不是使用最小连接数的节点。
     // 加入该用户的失败服务集合，并返回最新失败服务集合
     if(options.nid){
-        addFailNodes({uid:parseObj.query.uid,nid:options.nid})
+        await addFailNodes({uid:parseObj.query.uid,nid:options.nid})
         // todo 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
-        nodeFailTimes = incrNodeFailTimes({nid:options.nid})
+        nodeFailTimes = await incrNodeFailTimes({nid:options.nid})
         if(nodeFailTimes > 20){
             // todo 开启自动下线流程
-            startDeleteNode({nid:data.nid,mode:'auto'}).then(result => {
-                console.log("auto delete node success");
-            }).catch(err => {
-                console.error(err)
-            })
+            await startDeleteNode({nid:data.nid,mode:'auto'});
         }
     }
-    failNodes = queryFailNodes({uid:parseObj.query.uid})
+    failNodes = await queryFailNodes({uid:parseObj.query.uid})
 
-    var allNodes = myRedis.client.zRange(CONST.SERVER_SEND, 0,50);
+    var allNodes = await myRedis.client.zRange(CONST.SERVER_SEND, 0,50);
     try {
-        allNodes.then(allNodes2 =>{
-            allNodes2.forEach(node => {
-                if(nid) throw BreakError;
-                if(!failNodes.contains(node)){
-                    nid = node;
-                }
-            })
-        });
+        allNodes.forEach(node => {
+            if(nid) throw BreakError;
+            if(!failNodes.indexOf(node) > -1){
+                nid = node;
+            }
+        })
     } catch(e) {
-        if (e!==BreakError) console.log("跳出循环,nid:" + nid);
+        if (e!==BreakError){
+            console.log("跳出循环,nid:" + nid);
+        }
     }
 
-    target = myRedis.client.get(nid)
+    target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
     if(target){
         if(options.nid){
             // 删除失败nid与uid的关联
-            deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":parseObj.query.uid})
+            await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":parseObj.query.uid})
         }
         // 为新的nid与uid建立关联
-        addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
+        await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
         //将HTTP请求传递给目标node进程
         proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
     }else{

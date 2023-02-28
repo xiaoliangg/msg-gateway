@@ -212,7 +212,7 @@ export const queryFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const incrNodeFailTimes = async data => {
-  return await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.uid));
+  return await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
 }
 /**
  * 节点的连续失败次数重置为0
@@ -220,5 +220,5 @@ export const incrNodeFailTimes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearNodeFailTimes = async data => {
-  await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(data.uid));
+  await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
 }
