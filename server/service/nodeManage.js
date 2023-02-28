@@ -162,12 +162,14 @@ export const queryOnlineNode = async server => {
 
   if(server === CONST.SERVERS_SEND){
     onlineNodes = await myRedis.client.zRangeWithScores(server,0,50);
-    onlineNodes.forEach(async node =>{
+    // JavaScript 中的 forEach不支持 promise 感知，也支持 async 和await，所以不能在 forEach 使用 await
+    for (let index = 0; index < onlineNodes.length; index ++) {
+      const node = onlineNodes[index];
       nodeWsValue = await myRedis.client.get(CONST.SERVERS_SEND_WS(node.value));
       nodeHttpValue = await myRedis.client.get(CONST.SERVERS_SEND_HTTP(node.value));
       finalyResult.push({"ws":nodeWsValue,"http":nodeHttpValue,"score":node.score,"id":node.value})
-    })
-    return Promise.resolve(finalyResult);
+    }
+    return finalyResult;
   }else if(server === CONST.SERVERS_DISPATCH){
     return await myRedis.client.sMembers(CONST.SERVERS_DISPATCH);
   }else{

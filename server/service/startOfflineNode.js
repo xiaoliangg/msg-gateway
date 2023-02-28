@@ -17,7 +17,8 @@ export const startOfflineNode = async nid => {
   if (nid) {
     // yltodo 移除该节点上的所有连接、redis信息、内存信息等
     let allUids = await queryAllUidsByNid(nid);
-    allUids.forEach(uid =>{
+    for (let index = 0; index < allUids.length; index ++) {
+      const uid = allUids[index];
       let wsInfo = conInfo.conInfo.get(uid);
       // 断开原有的代理长连接
       wsInfo.proxySocket.end();
@@ -27,7 +28,7 @@ export const startOfflineNode = async nid => {
       server.emit('connectOtherNode', wsInfo.proxyReq, wsInfo.req, wsInfo.socket, extend(wsInfo.options,{switchProtocols:false}), wsInfo.head);
 
       deleteLongConnect(nid,uid);
-    })
+    }
     await myRedis.client.del(CONST.NODE_FAIL_TIMES(nid));
   }
 }
