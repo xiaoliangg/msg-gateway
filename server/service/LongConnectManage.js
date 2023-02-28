@@ -12,7 +12,7 @@ import * as CONST from '../service/CONST'
 export const addLongConnect = async data => {
   await myRedis.client.sAdd(CONST.SERVER_ONLINE_UIDS(data.nid),data.uid);
   await myRedis.client.set(CONST.SERVER_ONLINE_BELONG_NID(data.uid),data.nid);
-  await myRedis.client.zIncrBy(CONST.SERVER_SEND, 1, nid)
+  await myRedis.client.zIncrBy(CONST.SERVER_SEND, 1, data.nid)
 }
 
 // 节点释放长连接

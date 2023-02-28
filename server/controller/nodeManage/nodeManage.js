@@ -69,7 +69,7 @@ class Admin {
             }
             res.send(successData)
           }).catch(err => {
-            console.error(err)
+            console.error("saveNode error:" + err)
         let errData = {
           code: 10014,
           message: '服务器异常，请重新操作1',
