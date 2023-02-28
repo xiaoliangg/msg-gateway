@@ -176,11 +176,11 @@ server.on('upgrade', function (req, socket, head) {
         var ss = myRedis.client.zRange(CONST.SERVERS_SEND, 0,0);
         ss.then(aa =>{
             nid = aa[0];
-            return myRedis.client.get(nid);
+            return myRedis.client.get(CONST.SERVERS_SEND_WS(nid));
         }).then(target =>{
             // 新增长连接
-            addLongConnect({"server":CONST.SERVERS_SEND,"nid":nid,"uid":parseObj.query.uid})
             if(target){
+                addLongConnect({"server":CONST.SERVERS_SEND,"nid":nid,"uid":parseObj.query.uid})
                 //将HTTP请求传递给目标node进程
                 proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
             }else{
