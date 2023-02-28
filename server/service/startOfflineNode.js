@@ -29,6 +29,6 @@ export const startOfflineNode = async nid => {
 
       deleteLongConnect(nid,uid);
     }
-    await myRedis.client.del(CONST.NODE_FAIL_TIMES(nid));
+    await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(nid));
   }
 }

@@ -11,9 +11,9 @@ import * as CONST from '../../service/CONST'
 // 校验请求数据
 function validateOnlineNodeReq(data) {
   if(data && data.server){
-    if(data.server === CONST.SERVERS_SEND  && data.data[0].ws && data.data[0].http){
+    if(data.server === CONST.SERVER_SEND  && data.data[0].ws && data.data[0].http){
       return null;
-    }else if(data.server === CONST.SERVERS_DISPATCH && data.data[0].http){
+    }else if(data.server === CONST.SERVER_DISPATCH && data.data[0].http){
       return null;
     }
   }
@@ -29,7 +29,7 @@ class Admin {
 
   /**
    *上线节点
-   * 示例报文: {"server":"servers_send_ws","data":[{"value":"http://localhost:15041"},{"value":"http://localhost:15044"}]}
+   * 示例报文: {"server":"server_send_ws","data":[{"value":"http://localhost:15041"},{"value":"http://localhost:15044"}]}
    *method post
    * @param {*} req
    * @param {*} res
@@ -91,7 +91,7 @@ class Admin {
   async offlineNode (req, res, next) {
     const data = req.body
     const params = req.query
-    if(data.server === CONST.SERVERS_SEND){
+    if(data.server === CONST.SERVER_SEND){
       startDeleteNode({nid:data.nid,mode:'manual'}).then(result => {
         let successData = {
           code: 10000,
@@ -107,7 +107,7 @@ class Admin {
         }
         res.send(errData)
       })
-    }else if(data.server === CONST.SERVERS_DISPATCH){
+    }else if(data.server === CONST.SERVER_DISPATCH){
       deleteDispatchServer(data).then(result => {
         let successData = {
           code: 10000,

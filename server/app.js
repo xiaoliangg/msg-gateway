@@ -108,10 +108,10 @@ app.listen(port, function () {
 })
 
 // 模拟消息分发服务的http短连接
-// var servers_dispatch = await myRedis.client.sMembers(CONST.SERVERS_DISPATCH);
-var servers_dispatch = [];
+// var server_dispatch = await myRedis.client.sMembers(CONST.SERVER_DISPATCH);
+var server_dispatch = [];
 export const initDispatchServer = async () =>{
-    myRedis.client.sMembers(CONST.SERVERS_DISPATCH).then(a => servers_dispatch = a);
+    myRedis.client.sMembers(CONST.SERVER_DISPATCH).then(a => server_dispatch = a);
 }
 initDispatchServer()
 
@@ -143,17 +143,17 @@ export var server = http.createServer(function(req, res) {
     if(req.headers.host.toLowerCase().indexOf("oms.msgdispatch.com") > -1){
         console.log("msgdispatch!!!!!")
         //获取第一个server
-        var target = servers_dispatch.shift();
-        servers_dispatch.push(target);
+        var target = server_dispatch.shift();
+        server_dispatch.push(target);
         //将HTTP请求传递给目标node进程
         proxy.web(req,res,{target: target });
         //将第一个server放在末尾，以实现循环地指向不同进程
     }else if(req.headers.host.toLowerCase().indexOf("oms.msgsend.com") > -1){
         console.log("msgsend!!!!!")
         //todo 如果有用户id,通过用户id查找nid。 否则，随机选一个
-        var target = servers_send.shift();
+        var target = server_send.shift();
         //将第一个server放在末尾，以实现循环地指向不同进程
-        servers_send.push(target);
+        server_send.push(target);
         //将HTTP请求传递给目标node进程
         proxy.web(req,res,{target: target });
     }else{
@@ -173,14 +173,14 @@ server.on('upgrade', function (req, socket, head) {
         console.log(parseObj.query.uid);
         // 获取节点
         var nid;
-        var ss = myRedis.client.zRange(CONST.SERVERS_SEND, 0,0);
+        var ss = myRedis.client.zRange(CONST.SERVER_SEND, 0,0);
         ss.then(aa =>{
             nid = aa[0];
-            return myRedis.client.get(CONST.SERVERS_SEND_WS(nid));
+            return myRedis.client.get(CONST.SERVER_SEND_WS(nid));
         }).then(target =>{
             // 新增长连接
             if(target){
-                addLongConnect({"server":CONST.SERVERS_SEND,"nid":nid,"uid":parseObj.query.uid})
+                addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
                 //将HTTP请求传递给目标node进程
                 proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
             }else{
@@ -260,7 +260,7 @@ proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
     }
     failNodes = queryFailNodes({uid:parseObj.query.uid})
 
-    var allNodes = myRedis.client.zRange(CONST.SERVERS_SEND, 0,50);
+    var allNodes = myRedis.client.zRange(CONST.SERVER_SEND, 0,50);
     try {
         allNodes.then(allNodes2 =>{
             allNodes2.forEach(node => {
@@ -278,10 +278,10 @@ proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
     if(target){
         if(options.nid){
             // 删除失败nid与uid的关联
-            deleteLongConnect({"server":CONST.SERVERS_SEND,"nid":options.nid,"uid":parseObj.query.uid})
+            deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":parseObj.query.uid})
         }
         // 为新的nid与uid建立关联
-        addLongConnect({"server":CONST.SERVERS_SEND,"nid":nid,"uid":parseObj.query.uid})
+        addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
         //将HTTP请求传递给目标node进程
         proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
     }else{

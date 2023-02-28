@@ -12,7 +12,7 @@ var urlExist = require('url-exist');
  * @returns {Promise<unknown>}
  */
 export const saveNode = async data => {
-  if(data.server === CONST.SERVERS_SEND){
+  if(data.server === CONST.SERVER_SEND){
     // todo 校验如果上线节点在下线中，抛出异常
     // var errRes = validateDowning(data);
     // if(errRes) throw errRes;
@@ -23,26 +23,26 @@ export const saveNode = async data => {
       data.data.forEach(item => {
         item.score = 0;
         nid = crypto.randomUUID();
-        map.push(CONST.SERVERS_SEND_WS(nid));
+        map.push(CONST.SERVER_SEND_WS(nid));
         map.push(item.ws);
-        map.push(CONST.SERVERS_SEND_HTTP(nid));
+        map.push(CONST.SERVER_SEND_HTTP(nid));
         map.push(item.http);
         item.value = nid;
       })
 
       if(map.length){
         await myRedis.client.multi().mSet(map).exec();
-        await myRedis.client.multi().zAdd(CONST.SERVERS_SEND,data.data).exec();
+        await myRedis.client.multi().zAdd(CONST.SERVER_SEND,data.data).exec();
       }
     }
-  }else if(data.server === CONST.SERVERS_DISPATCH){
+  }else if(data.server === CONST.SERVER_DISPATCH){
     let arr = [];
     data.data.forEach(item => {
       arr.push(item.http);
     })
     if(arr.length != 0){
-      await myRedis.client.multi().sAdd(CONST.SERVERS_DISPATCH, arr).exec();
-      await myRedis.client.multi().sRem(CONST.SERVERS_DISPATCH_DOWN,arr).exec();
+      await myRedis.client.multi().sAdd(CONST.SERVER_DISPATCH, arr).exec();
+      await myRedis.client.multi().sRem(CONST.SERVER_DISPATCH_DOWN,arr).exec();
       await initDispatchServer();
     }
   }else{
@@ -100,14 +100,14 @@ export const startDeleteNode = async data => {
   // 移入下线中的节点集合
   if(data.mode === 'auto'){
     // 心跳检测ws地址。30min  每分钟check一次，超过30min后，下线。
-    var ws = await myRedis.client.get(CONST.SERVERS_SEND_WS(nid))
+    var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
     var success = await heartCheck(ws,60,60*30);
     if(success){
       // 如果30min内成功,重新加入在线集合
       await myRedis.client.zAdd(data.server,data.nid);
     }else{
       // 超过30min后，下线
-      await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_AUTO_DOWNING,data.nid);
+      await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
       startOfflineNode(data.nid).then(result => {
         console.log("下线成功");
         deleteNodeFinish({'mode':'auto',nid:result.nid})
@@ -116,7 +116,7 @@ export const startDeleteNode = async data => {
       })
     }
   }else{
-    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_MANUAL_DOWNING,data.nid);
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
     startOfflineNode(data.nid).then(result => {
       console.log("下线成功");
       deleteNodeFinish({'mode':'manual',nid:result.nid})
@@ -128,15 +128,15 @@ export const startDeleteNode = async data => {
 
 // 下线节点完成
 export const deleteNodeFinish = async data => {
-  var ws = await myRedis.client.getDel(CONST.SERVERS_SEND_WS(data.nid))
-  var http = await myRedis.client.getDel(CONST.SERVERS_SEND_HTTP(data.nid))
+  var ws = await myRedis.client.getDel(CONST.SERVER_SEND_WS(data.nid))
+  var http = await myRedis.client.getDel(CONST.SERVER_SEND_HTTP(data.nid))
   if(data.mode === 'auto'){
-    await myRedis.client.sRem(CONST.SERVERS_SEND_WS_AUTO_DOWNING,data.nid);
+    await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
     // 查询ws地址和http地址
-    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_AUTO_DOWN,{"ws":ws,"http":http});
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,{"ws":ws,"http":http});
   }else{
-    await myRedis.client.sRem(CONST.SERVERS_SEND_WS_MANUAL_DOWNING,data.nid);
-    await myRedis.client.sAdd(CONST.SERVERS_SEND_WS_MANUAL_DOWN,{"ws":ws,"http":http});
+    await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWN,{"ws":ws,"http":http});
   }
 }
 
@@ -147,8 +147,8 @@ export const deleteNodeFinish = async data => {
  */
 export const deleteDispatchServer = async data => {
   return new Promise((resolve, reject) => {
-    myRedis.client.sRem(CONST.SERVERS_DISPATCH,data.http);
-    myRedis.client.sAdd(CONST.SERVERS_DISPATCH_DOWN,data.http);
+    myRedis.client.sRem(CONST.SERVER_DISPATCH,data.http);
+    myRedis.client.sAdd(CONST.SERVER_DISPATCH_DOWN,data.http);
     initDispatchServer();
     resolve();
   })
@@ -161,18 +161,18 @@ export const queryOnlineNode = async server => {
   var nodeWsValue;
   var nodeHttpValue;
 
-  if(server === CONST.SERVERS_SEND){
+  if(server === CONST.SERVER_SEND){
     onlineNodes = await myRedis.client.zRangeWithScores(server,0,50);
     // JavaScript 中的 forEach不支持 promise 感知，也支持 async 和await，所以不能在 forEach 使用 await
     for (let index = 0; index < onlineNodes.length; index ++) {
       const node = onlineNodes[index];
-      nodeWsValue = await myRedis.client.get(CONST.SERVERS_SEND_WS(node.value));
-      nodeHttpValue = await myRedis.client.get(CONST.SERVERS_SEND_HTTP(node.value));
+      nodeWsValue = await myRedis.client.get(CONST.SERVER_SEND_WS(node.value));
+      nodeHttpValue = await myRedis.client.get(CONST.SERVER_SEND_HTTP(node.value));
       finalyResult.push({"ws":nodeWsValue,"http":nodeHttpValue,"score":node.score,"id":node.value})
     }
     return finalyResult;
-  }else if(server === CONST.SERVERS_DISPATCH){
-    return await myRedis.client.sMembers(CONST.SERVERS_DISPATCH);
+  }else if(server === CONST.SERVER_DISPATCH){
+    return await myRedis.client.sMembers(CONST.SERVER_DISPATCH);
   }else{
     throw "未知的server";
   }
@@ -184,7 +184,7 @@ export const queryOnlineNode = async server => {
  * @returns {Promise<unknown>}
  */
 export const addFailNodes = async data => {
-  return await myRedis.client.sAdd(CONST.FAILED_NODES(data.uid),data.nid);
+  return await myRedis.client.sAdd(CONST.SERVER_FAILED_NODES(data.uid),data.nid);
 
 }
 /**
@@ -193,7 +193,7 @@ export const addFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearFailNodes = async data => {
-  return await myRedis.client.del(CONST.FAILED_NODES(data.uid));
+  return await myRedis.client.del(CONST.SERVER_FAILED_NODES(data.uid));
 
 }
 
@@ -203,7 +203,7 @@ export const clearFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const queryFailNodes = async data => {
-  return await myRedis.client.sMembers(CONST.FAILED_NODES(data.uid))
+  return await myRedis.client.sMembers(CONST.SERVER_FAILED_NODES(data.uid))
 }
 
 /**
@@ -212,7 +212,7 @@ export const queryFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const incrNodeFailTimes = async data => {
-  return await myRedis.client.incr(CONST.NODE_FAIL_TIMES(data.uid));
+  return await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.uid));
 }
 /**
  * 节点的连续失败次数重置为0
@@ -220,5 +220,5 @@ export const incrNodeFailTimes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearNodeFailTimes = async data => {
-  await myRedis.client.del(CONST.NODE_FAIL_TIMES(data.uid));
+  await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(data.uid));
 }
