@@ -23,8 +23,8 @@ export const deleteLongConnect = async data => {
 }
 
 // 查询节点上所有长连接
-export const queryAllUidsByNid = async data => {
-  return await myRedis.client.sMembers(CONST.SERVER_ONLINE_UIDS(data.nid));
+export const queryAllUidsByNid = async nid => {
+  return await myRedis.client.sMembers(CONST.SERVER_ONLINE_UIDS(nid));
 }
 
 // 查询长连接所属节点

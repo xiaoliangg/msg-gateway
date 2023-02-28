@@ -2,8 +2,9 @@
 
 var myRedis = require("../redis/myredis");
 const crypto = require('crypto');
-import * as CONST from '../service/CONST'
 import {initDispatchServer} from '../app'
+import {startOfflineNode} from './startOfflineNode'
+import * as CONST from '../service/CONST'
 var urlExist = require('url-exist');
 
 /**
@@ -96,7 +97,7 @@ async function heartCheck(url,interval,timeout) {
 
 // 开始下线节点
 export const startDeleteNode = async data => {
-  await myRedis.client.zRem(data.server,data.nid);
+  await myRedis.client.zRem(CONST.SERVER_SEND,data.nid);
   // 移入下线中的节点集合
   if(data.mode === 'auto'){
     // 心跳检测ws地址。30min  每分钟check一次，超过30min后，下线。
@@ -104,35 +105,35 @@ export const startDeleteNode = async data => {
     var success = await heartCheck(ws,60,60*30);
     if(success){
       // 如果30min内成功,重新加入在线集合
-      await myRedis.client.zAdd(data.server,data.nid);
+      await myRedis.client.zAdd(CONST.SERVER_SEND,data.nid);
     }else{
       // 超过30min后，下线
       await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
       startOfflineNode(data.nid).then(result => {
-        console.log("下线成功");
+        console.log(`自动下线成功,nid:${data.nid}`);
         deleteNodeFinish({'mode':'auto',nid:result.nid})
       }).catch(err => {
-        console.error("下线失败")
+        console.error(`自动下线失败,nid:${data.nid}`);
       })
     }
   }else{
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
     startOfflineNode(data.nid).then(result => {
-      console.log("下线成功");
-      deleteNodeFinish({'mode':'manual',nid:result.nid})
+      console.log(`手动下线成功,nid:${data.nid}`);
+      deleteNodeFinish({'mode':'manual',nid:data.nid})
     }).catch(err => {
-      console.error("下线失败")
+      console.error(`手动下线失败,nid:${data.nid},error:${err}`);
     })
   }
 }
 
 // 下线节点完成
 export const deleteNodeFinish = async data => {
+  // 查询ws地址和http地址
   var ws = await myRedis.client.getDel(CONST.SERVER_SEND_WS(data.nid))
   var http = await myRedis.client.getDel(CONST.SERVER_SEND_HTTP(data.nid))
   if(data.mode === 'auto'){
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
-    // 查询ws地址和http地址
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,{"ws":ws,"http":http});
   }else{
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);

@@ -102,7 +102,7 @@ class Admin {
       }).catch(err => {
         let errData = {
           code: 10014,
-          message: '服务器异常，请重新操作',
+          message: '服务器异常，请重新操作22',
           result: err
         }
         res.send(errData)
