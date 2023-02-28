@@ -111,7 +111,7 @@ export const startDeleteNode = async data => {
       await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
       startOfflineNode(data.nid).then(result => {
         console.log(`自动下线成功,nid:${data.nid}`);
-        deleteNodeFinish({'mode':'auto',nid:result.nid})
+        deleteNodeFinish({'mode':'auto',nid:data.nid})
       }).catch(err => {
         console.error(`自动下线失败,nid:${data.nid}`);
       })
@@ -130,15 +130,18 @@ export const startDeleteNode = async data => {
 // 下线节点完成
 export const deleteNodeFinish = async data => {
   // 查询ws地址和http地址
-  var ws = await myRedis.client.getDel(CONST.SERVER_SEND_WS(data.nid))
-  var http = await myRedis.client.getDel(CONST.SERVER_SEND_HTTP(data.nid))
+  var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(data.nid))
+  var http = await myRedis.client.get(CONST.SERVER_SEND_HTTP(data.nid))
   if(data.mode === 'auto'){
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
-    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,{"ws":ws,"http":http});
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":ws,"http":http}));
   }else{
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
-    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWN,{"ws":ws,"http":http});
+    //todo json对象转字符串
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWN,JSON.stringify({"ws":ws,"http":http}));
   }
+  await myRedis.client.del(CONST.SERVER_SEND_WS(data.nid))
+  await myRedis.client.del(CONST.SERVER_SEND_HTTP(data.nid))
 }
 
 /**
