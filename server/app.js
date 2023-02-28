@@ -292,9 +292,10 @@ proxy.on('connectOtherNode', function(proxyReq, req, socket, options, head) {
 
 // Listen for the `close` event on `proxy`.
 // 貌似对应客户端断开
-proxy.on('close', function (res, socket, head) {
+proxy.on('close', function (res, socket, head,uid,nid) {
     // view disconnected websocket connections
     console.log('Client disconnected');
+    deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
 });
 
 //

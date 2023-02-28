@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..0de8670 100644
+index 270f23f..50dcab1 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -103,7 +103,7 @@ index 270f23f..0de8670 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,10 +128,25 @@ module.exports = {
+@@ -118,45 +128,84 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
@@ -124,14 +124,15 @@ index 270f23f..0de8670 100644
  
        // Allow us to listen when the websocket has completed
 -      proxySocket.on('end', function () {
+-        server.emit('close', proxyRes, proxySocket, proxyHead);
 +      proxySocket.on('end', function () { // 关闭测试用网页时,会进入此方法，客户端正常断开
 +        // yltodo
 +        var parseObj = url.parse(req.url,true);
 +        conInfo.conInfo.delete(parseObj.query.uid);
-         server.emit('close', proxyRes, proxySocket, proxyHead);
++        server.emit('close', proxyRes, proxySocket, proxyHead,parseObj.query.uid,options.nid);
        });
  
-@@ -129,34 +154,58 @@ module.exports = {
+       // The pipe below will end proxySocket if socket closes cleanly, but not
        // if it errors (eg, vanishes from the net and starts returning
        // EHOSTUNREACH). We need to do that explicitly.
        socket.on('error', function () {
