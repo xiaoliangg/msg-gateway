@@ -1,11 +1,14 @@
 //redis封装
 var redis = require('redis');
 import * as CONST from '../service/CONST'
+import config from '../config/default'
+
+const redisUrl = process.env.NODE_ENV === 'production' ? config.prod.redisUrl : config.dev.redisUrl
 
 var client = redis.createClient({
     // redis[s]://[[username][:password]@][host][:port][/db-number]:
     // url: 'redis://alice:foobared@awesome.redis.server:6380'
-    url: 'redis://10.129.18.143:6379'
+    url: redisUrl
 });
 // client.on('error',function(err){
 //     console.log('Redis Error:'+err);
