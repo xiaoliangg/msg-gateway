@@ -19,21 +19,22 @@ export const saveNode = async data => {
 
     let map = [];
     let nid;
-    data.data.forEach(item => {
-      item.score = 0;
-      nid = crypto.randomUUID();
-      map.push(CONST.SERVERS_SEND_WS(nid));
-      map.push(item.ws);
-      map.push(CONST.SERVERS_SEND_HTTP(nid));
-      map.push(item.http);
-      item.value = nid;
-    })
+    if(data.data && data.data.length != 0){
+      data.data.forEach(item => {
+        item.score = 0;
+        nid = crypto.randomUUID();
+        map.push(CONST.SERVERS_SEND_WS(nid));
+        map.push(item.ws);
+        map.push(CONST.SERVERS_SEND_HTTP(nid));
+        map.push(item.http);
+        item.value = nid;
+      })
 
-    if(!map.length){
-      return resolve();
+      if(map.length){
+        await myRedis.client.multi().mSet(map).exec();
+        await myRedis.client.multi().zAdd(CONST.SERVERS_SEND,data.data).exec();
+      }
     }
-    await myRedis.client.multi().mSet(map).exec();
-    await myRedis.client.multi().zAdd(CONST.SERVERS_SEND,data.data).exec();
   }else if(data.server === CONST.SERVERS_DISPATCH){
     let arr = [];
     data.data.forEach(item => {
