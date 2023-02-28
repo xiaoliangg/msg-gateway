@@ -19,7 +19,9 @@ export const addLongConnect = async data => {
 export const deleteLongConnect = async data => {
   await myRedis.client.sRem(CONST.SERVER_ONLINE_UIDS(data.nid),data.uid);
   await myRedis.client.del(CONST.SERVER_ONLINE_BELONG_NID(data.uid));
-  await myRedis.client.zIncrBy(CONST.SERVER_SEND, -1, data.nid)
+  if(myRedis.client.zRank(CONST.SERVER_SEND,data.nid)){ // 如果不存在,zRank会返回null
+    await myRedis.client.zIncrBy(CONST.SERVER_SEND, -1, data.nid)
+  }
 }
 
 // 查询节点上所有长连接
