@@ -27,9 +27,9 @@ export const startOfflineNode = async nid => {
 
       // todo 创建新的代理长连接。发送connectOtherNode，或新建一个其他事件
       // conInfo.conInfo.set(parseObj.query.uid,{req, socket, options, head,proxyReq,proxySocket});
-      server.emit('connectOtherNode', wsInfo.proxyReq, wsInfo.req, wsInfo.socket, extend(wsInfo.options,{switchProtocols:false}), wsInfo.head);
+      await server.emit('connectOtherNode', wsInfo.proxyReq, wsInfo.req, wsInfo.socket, extend(wsInfo.options,{switchProtocols:false}), wsInfo.head);
 
-      deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+      await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
     }
     await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(nid));
   }

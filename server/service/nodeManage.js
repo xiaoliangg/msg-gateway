@@ -137,7 +137,6 @@ export const deleteNodeFinish = async data => {
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":ws,"http":http}));
   }else{
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
-    //todo json对象转字符串
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWN,JSON.stringify({"ws":ws,"http":http}));
   }
   await myRedis.client.del(CONST.SERVER_SEND_WS(data.nid))
