@@ -164,7 +164,7 @@ export var server = http.createServer(function(req, res) {
         //将第一个server放在末尾，以实现循环地指向不同进程
     }else if(req.headers.host.toLowerCase().indexOf("oms.msgsend.com") > -1){
         console.log("msgsend!!!!!")
-        //todo 如果有用户id,通过用户id查找nid。 否则，随机选一个
+        //如果有用户id,通过用户id查找nid。 否则，轮询一个
         var parseObj = url.parse(req.url,true);
         var uid = parseObj.query.uid;
         var target = null;
@@ -294,10 +294,10 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,options.nid);
     if(zRank){
         await addFailNodes({uid:parseObj.query.uid,nid:options.nid})
-        // todo 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
+        // 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
         nodeFailTimes = await incrNodeFailTimes({nid:options.nid})
         if(nodeFailTimes > 20){
-            // todo 开启自动下线流程
+            // 开启自动下线流程
             await startDeleteNode({nid:data.nid,mode:'auto'});
         }
     }

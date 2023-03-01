@@ -14,9 +14,6 @@ var urlExist = require('url-exist');
  */
 export const saveNode = async data => {
   if(data.server === CONST.SERVER_SEND){
-    // todo 校验如果上线节点在下线中，抛出异常
-    // var errRes = validateDowning(data);
-    // if(errRes) throw errRes;
 
     let map = [];
     let nid;
