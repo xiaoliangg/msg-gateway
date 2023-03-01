@@ -247,7 +247,9 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     var allNodes;
     // 不再使用刚刚失败的节点。轮询其他节点，而不是使用最小连接数的节点。
     // 加入该用户的失败服务集合，并返回最新失败服务集合
-    if(options.nid){
+    // 如果nid在在线集合，进行处理；如果不在在线集合，说明已经是下线或下线中的节点，则无需进行处理
+    var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,options.nid);
+    if(zRank){
         await addFailNodes({uid:parseObj.query.uid,nid:options.nid})
         // todo 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
         nodeFailTimes = await incrNodeFailTimes({nid:options.nid})

@@ -29,6 +29,8 @@ export const saveNode = async data => {
         map.push(CONST.SERVER_SEND_HTTP(nid));
         map.push(item.http);
         item.value = nid;
+        myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
+        myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
       })
 
       if(map.length){
@@ -108,13 +110,9 @@ export const startDeleteNode = async data => {
       await myRedis.client.zAdd(CONST.SERVER_SEND,data.nid);
     }else{
       // 超过30min后，下线
-      await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
-      startOfflineNode(data.nid).then(result => {
-        console.log(`自动下线成功,nid:${data.nid}`);
-        deleteNodeFinish({'mode':'auto',nid:data.nid})
-      }).catch(err => {
-        console.error(`自动下线失败,nid:${data.nid}`);
-      })
+      // 自动下线无需操作长连接，node侧长连接失败后，会自动匹配其他节点
+      // await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
+      await deleteNodeFinish({'mode':'auto',nid:data.nid})
     }
   }else{
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
@@ -133,7 +131,7 @@ export const deleteNodeFinish = async data => {
   var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(data.nid))
   var http = await myRedis.client.get(CONST.SERVER_SEND_HTTP(data.nid))
   if(data.mode === 'auto'){
-    await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
+    // await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":ws,"http":http}));
   }else{
     await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);

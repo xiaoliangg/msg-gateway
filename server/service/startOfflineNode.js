@@ -17,19 +17,14 @@ import {
 
 export const startOfflineNode = async nid => {
   if (nid) {
-    // yltodo 移除该节点上的所有连接、redis信息、内存信息等
+    // 移除该节点上的所有连接、redis信息、内存信息等
     let allUids = await queryAllUidsByNid(nid);
     for (let index = 0; index < allUids.length; index ++) {
       const uid = allUids[index];
       let wsInfo = conInfo.conInfo.get(uid);
       // 断开原有的代理长连接
-      // wsInfo.proxySocket.end();
-
-      // todo 创建新的代理长连接。发送connectOtherNode，或新建一个其他事件
-      // conInfo.conInfo.set(parseObj.query.uid,{req, socket, options, head,proxyReq,proxySocket});
-      await server.emit('connectOtherNode', wsInfo.proxyReq, wsInfo.req, wsInfo.socket, extend(wsInfo.options,{switchProtocols:false}), wsInfo.head);
-
-      await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+      // wsInfo.proxySocket.error(); // 报错: wsInfo.proxySocket.error is not a function
+      wsInfo.proxySocket.emit("error",new Error("manual disconnect"))
     }
     await myRedis.client.del(CONST.SERVER_NODE_FAIL_TIMES(nid));
   }

@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..50dcab1 100644
+index 270f23f..44413ca 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -108,6 +108,7 @@ index 270f23f..50dcab1 100644
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
 -      proxySocket.on('error', onOutgoingError);
+-
 +      // yl 目标服务断开的监听
 +      // 长连接建立完成后，目标服务异常断开
 +      proxySocket.on('error', onOutgoingError2);
@@ -121,7 +122,6 @@ index 270f23f..50dcab1 100644
 +      //     server.emit('connectOtherNode', proxyReq, req, socket, options, head);
 +      //   }
 +      // });
- 
        // Allow us to listen when the websocket has completed
 -      proxySocket.on('end', function () {
 -        server.emit('close', proxyRes, proxySocket, proxyHead);
@@ -163,11 +163,13 @@ index 270f23f..50dcab1 100644
 +      console.log('yl测试222');
        proxySocket.pipe(socket).pipe(proxySocket);
  
-       server.emit('open', proxySocket);
-       server.emit('proxySocket', proxySocket);  //DEPRECATED.
-+
+-      server.emit('open', proxySocket);
 +      // 写入用户路由表
 +      var parseObj = url.parse(req.url,true);
++
++      server.emit('open', proxySocket,parseObj.query.uid,options.nid);
+       server.emit('proxySocket', proxySocket);  //DEPRECATED.
++
 +      conInfo.conInfo.set(parseObj.query.uid,{req, socket, options, head,proxyReq,proxySocket});
      });
  
