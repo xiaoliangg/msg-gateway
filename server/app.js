@@ -175,7 +175,7 @@ export var server = http.createServer(function(req, res) {
                 if(nid){
                     // nid不为空说明长连接存在
                     target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
-                    console.log(`${uid} belongs ${nid},${target}`)
+                    console.log(`${uid} belongs node ${nid},${target}`)
                 }else{
                     // nid为空说明没有建立长连接
                     target = server_send.shift();
