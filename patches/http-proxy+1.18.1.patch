@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..44413ca 100644
+index 270f23f..32586d3 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -103,7 +103,7 @@ index 270f23f..44413ca 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,45 +128,84 @@ module.exports = {
+@@ -118,45 +128,82 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
@@ -116,7 +116,6 @@ index 270f23f..44413ca 100644
 +      //   if (clb) {
 +      //     clb(err, req, socket);
 +      //   } else {
-+      //     // yltodo待测试
 +      //     // proxySocket.resetAndDestroy(); // 直接摧毁socket
 +      //     // proxySocket.end(); // 猜测会走四次挥手过程。理解：目标服务断开连接时，应该不用再次主动关闭proxySocket。看之前的源码，目标服务报"error"时，会socket.end();客户端socket报 "error"时，会proxySocket.end()
 +      //     server.emit('connectOtherNode', proxyReq, req, socket, options, head);
@@ -126,7 +125,6 @@ index 270f23f..44413ca 100644
 -      proxySocket.on('end', function () {
 -        server.emit('close', proxyRes, proxySocket, proxyHead);
 +      proxySocket.on('end', function () { // 关闭测试用网页时,会进入此方法，客户端正常断开
-+        // yltodo
 +        var parseObj = url.parse(req.url,true);
 +        conInfo.conInfo.delete(parseObj.query.uid);
 +        server.emit('close', proxyRes, proxySocket, proxyHead,parseObj.query.uid,options.nid);
