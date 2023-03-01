@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..32586d3 100644
+index 270f23f..8f80b65 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -103,7 +103,7 @@ index 270f23f..32586d3 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,45 +128,82 @@ module.exports = {
+@@ -118,45 +128,81 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
@@ -158,12 +158,11 @@ index 270f23f..32586d3 100644
 +      }
 +      // }
  
-+      console.log('yl测试222');
        proxySocket.pipe(socket).pipe(proxySocket);
  
 -      server.emit('open', proxySocket);
 +      // 写入用户路由表
-+      var parseObj = url.parse(req.url,true);
++      var parseObj = url.parse(req.url, true);
 +
 +      server.emit('open', proxySocket,parseObj.query.uid,options.nid);
        server.emit('proxySocket', proxySocket);  //DEPRECATED.
