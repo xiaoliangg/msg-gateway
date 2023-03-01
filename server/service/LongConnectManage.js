@@ -33,6 +33,6 @@ export const queryAllUidsByNid = async nid => {
 }
 
 // 查询长连接所属节点
-export const queryNidByUid = async data => {
-  return await myRedis.client.get(CONST.SERVER_ONLINE_BELONG_NID(data.uid));
+export const queryNidByUid = async uid => {
+  return await myRedis.client.get(CONST.SERVER_ONLINE_BELONG_NID(uid));
 }

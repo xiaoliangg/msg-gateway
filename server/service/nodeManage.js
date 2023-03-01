@@ -2,7 +2,7 @@
 
 var myRedis = require("../redis/myredis");
 const crypto = require('crypto');
-import {initDispatchServer} from '../app'
+import {initDispatchServer,initSendServer} from '../app'
 import {startOfflineNode} from './startOfflineNode'
 import * as CONST from '../service/CONST'
 var urlExist = require('url-exist');
@@ -21,7 +21,8 @@ export const saveNode = async data => {
     let map = [];
     let nid;
     if(data.data && data.data.length != 0){
-      data.data.forEach(item => {
+      for (let index = 0; index < data.data.length; index ++) {
+        let item = data.data[index];
         item.score = 0;
         nid = crypto.randomUUID();
         map.push(CONST.SERVER_SEND_WS(nid));
@@ -29,13 +30,14 @@ export const saveNode = async data => {
         map.push(CONST.SERVER_SEND_HTTP(nid));
         map.push(item.http);
         item.value = nid;
-        myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
-        myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
-      })
+        await myRedis.client.sRem(CONST.SERVER_SEND_WS_MANUAL_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
+        await myRedis.client.sRem(CONST.SERVER_SEND_WS_AUTO_DOWN,JSON.stringify({"ws":item.ws,"http":item.http}));
+      }
 
       if(map.length){
         await myRedis.client.multi().mSet(map).exec();
         await myRedis.client.multi().zAdd(CONST.SERVER_SEND,data.data).exec();
+        await initSendServer()
       }
     }
   }else if(data.server === CONST.SERVER_DISPATCH){
@@ -100,6 +102,7 @@ async function heartCheck(url,interval,timeout) {
 // 开始下线节点
 export const startDeleteNode = async data => {
   await myRedis.client.zRem(CONST.SERVER_SEND,data.nid);
+  await initDispatchServer();
   // 移入下线中的节点集合
   if(data.mode === 'auto'){
     // 心跳检测ws地址。30min  每分钟check一次，超过30min后，下线。
@@ -139,6 +142,7 @@ export const deleteNodeFinish = async data => {
   }
   await myRedis.client.del(CONST.SERVER_SEND_WS(data.nid))
   await myRedis.client.del(CONST.SERVER_SEND_HTTP(data.nid))
+  await initDispatchServer();
 }
 
 /**

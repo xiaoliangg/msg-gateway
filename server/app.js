@@ -2,7 +2,8 @@ import router from './routes/index'
 import timeout from 'connect-timeout'
 import {
     addLongConnect,
-    deleteLongConnect
+    deleteLongConnect,
+    queryNidByUid
 } from './service/LongConnectManage'
 import {
     addFailNodes,
@@ -115,6 +116,19 @@ export const initDispatchServer = async () =>{
 }
 initDispatchServer()
 
+var server_send = [];
+export const initSendServer = async () =>{
+    server_send = [];
+    var onlineNodes = await myRedis.client.zRangeWithScores(CONST.SERVER_SEND,0,50);
+    var nodeHttpValue = null;
+    for (let index = 0; index < onlineNodes.length; index ++) {
+        const node = onlineNodes[index];
+        nodeHttpValue = await myRedis.client.get(CONST.SERVER_SEND_HTTP(node.value));
+        server_send.push(nodeHttpValue)
+    }
+}
+initSendServer()
+
 var httpProxy = require('http-proxy');
 var options = {
     // ws: true
@@ -151,11 +165,40 @@ export var server = http.createServer(function(req, res) {
     }else if(req.headers.host.toLowerCase().indexOf("oms.msgsend.com") > -1){
         console.log("msgsend!!!!!")
         //todo 如果有用户id,通过用户id查找nid。 否则，随机选一个
-        var target = server_send.shift();
-        //将第一个server放在末尾，以实现循环地指向不同进程
-        server_send.push(target);
-        //将HTTP请求传递给目标node进程
-        proxy.web(req,res,{target: target });
+        var parseObj = url.parse(req.url,true);
+        var uid = parseObj.query.uid;
+        var target = null;
+        if(uid){
+            (async () => {
+                let nid = await queryNidByUid(uid);
+
+                if(nid){
+                    // nid不为空说明长连接存在
+                    target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
+                    console.log(`${uid} belongs ${nid},${target}`)
+                }else{
+                    // nid为空说明没有建立长连接
+                    target = server_send.shift();
+                    server_send.push(target);
+                    // var target = await myRedis.client.zRange(CONST.SERVER_SEND, 0,0);
+                    console.log(`${uid} belongs no node,send request to ${target}`)
+                }
+                if(target){
+                    //将HTTP请求传递给目标node进程
+                    proxy.web(req,res,{target: target });
+                }else{
+                    console.error("没有可用的服务!!!!!")
+                }
+
+            })();
+        }else{
+            console.error("uid is null!!")
+            // let errData = {
+            //     code: 10009,
+            //     message: 'uid is null!!'
+            // }
+            proxy.web(req, res, { target: 'http://127.0.0.1:3000' });
+        }
     }else{
         console.error("wrong http host!!!!!")
         proxy.web(req, res, { target: 'http://127.0.0.1:3000' });
