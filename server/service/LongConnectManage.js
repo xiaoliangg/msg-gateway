@@ -23,7 +23,7 @@ export const deleteLongConnect = async data => {
   if(zRank){ // 如果不存在,zRank会返回null
     await myRedis.client.zIncrBy(CONST.SERVER_SEND, -1, data.nid)
   }else{
-    console.log(`${data.nid}为空,无需--1`)
+    console.log(`${data.nid}为空,无需减1`)
   }
 }
 
