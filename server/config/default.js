@@ -8,7 +8,7 @@ module.exports = {
         msgSendLongConnectDomain: 'oms.msglongconnect.com',
         managePort: 3000,
         routePort: 5051,
-        // 单位s
+        // 心跳检测,单位s
         heartCheckInterval: 60,
         heartCheckTimeout: 30*60
     },
@@ -17,12 +17,12 @@ module.exports = {
         // redis[s]://[[username][:password]@][host][:port][/db-number]:
         // url: 'redis://alice:foobared@awesome.redis.server:6380'
         redisUrl: 'redis://:udredis-lt4zg0sh@10.51.12.89:6379',
-        msgDispatchDomain: 'redis://10.129.18.143:6379',
-        msgSendDomain: 'redis://10.129.18.143:6379',
-        msgSendLongConnectDomain: 'redis://10.129.18.143:6379',
+        msgDispatchDomain: 'oms.msgdispatch.com',
+        msgSendDomain: 'oms.msgsend.com',
+        msgSendLongConnectDomain: 'oms.msglongconnect.com',
         managePort: 3000,
         routePort: 5051,
-        // 单位s
+        // 心跳检测,单位s
         heartCheckInterval: 60,
         heartCheckTimeout: 30*60
     }
