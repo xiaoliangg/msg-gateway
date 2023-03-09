@@ -1,5 +1,7 @@
 'use strict'
 
+import config from "../config/default";
+
 var myRedis = require("../redis/myredis");
 const crypto = require('crypto');
 import {initDispatchServer,initSendServer} from '../app'
@@ -7,14 +9,17 @@ import {startOfflineNode} from './startOfflineNode'
 import * as CONST from '../service/CONST'
 var urlExist = require('url-exist');
 
+const heartCheckInterval = process.env.NODE_ENV === 'production' ? config.prod.heartCheckInterval : config.dev.heartCheckInterval
+const heartCheckTimeout = process.env.NODE_ENV === 'production' ? config.prod.heartCheckTimeout : config.dev.heartCheckTimeout
+
 /**
  * 上线节点
  * @param data
  * @returns {Promise<unknown>}
  */
 export const saveNode = async data => {
+  console.log(`add new node:${data.server},${JSON.stringify(data.data)}`)
   if(data.server === CONST.SERVER_SEND){
-
     let map = [];
     let nid;
     if(data.data && data.data.length != 0){
@@ -34,6 +39,7 @@ export const saveNode = async data => {
       if(map.length){
         await myRedis.client.multi().mSet(map).exec();
         await myRedis.client.multi().zAdd(CONST.SERVER_SEND,data.data).exec();
+        console.log(`msgSend domain ${JSON.stringify(map)} online success,init cache.`)
         await initSendServer()
       }
     }
@@ -45,10 +51,12 @@ export const saveNode = async data => {
     if(arr.length != 0){
       await myRedis.client.multi().sAdd(CONST.SERVER_DISPATCH, arr).exec();
       await myRedis.client.multi().sRem(CONST.SERVER_DISPATCH_DOWN,arr).exec();
+      console.log(`msgDispatch domain ${JSON.stringify(arr)} online success,init cache.`)
       await initDispatchServer();
     }
   }else{
-    throw "不支持的服务6"
+    console.error("unsupported domain name!")
+    throw "unsupported domain name!"
   }
 }
 
@@ -60,11 +68,12 @@ export const saveNode = async data => {
  * @returns {Promise<Promise<unknown> extends PromiseLike<infer U> ? U : Promise<unknown>>}
  */
 async function heartCheck(url,interval,timeout) {
+  console.log(`url heart check:${url},${interval},${timeout}`)
   var timeoutId = null;
   var intervalId = null;
   var p1 = new Promise((resolve,reject) =>{
     const check = async (url) => {
-      console.log(`url心跳检测检测:${url}`)
+      console.log(`url heart check:${url}`)
       const exists = await urlExist(url);
       if(exists){
         if(intervalId) {
@@ -96,37 +105,42 @@ async function heartCheck(url,interval,timeout) {
   return Promise.race([p1,p2]);
 }
 
+
 // 开始下线节点
 export const startDeleteNode = async data => {
+  console.log(`startDeleteNode:${JSON.stringify(data)}`)
   await myRedis.client.zRem(CONST.SERVER_SEND,data.nid);
   await initDispatchServer();
   // 移入下线中的节点集合
   if(data.mode === 'auto'){
-    // 心跳检测ws地址。30min  每分钟check一次，超过30min后，下线。
+    // 心跳检测ws地址:每heartCheckInterval check一次，超过heartCheckTimeout后，下线
     var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
-    var success = await heartCheck(ws,60,60*30);
+    var success = await heartCheck(ws,heartCheckInterval,heartCheckTimeout);
     if(success){
-      // 如果30min内成功,重新加入在线集合
+      // 如果成功,重新加入在线集合
+      console.log(`heartCheck success:${ws}`)
       await myRedis.client.zAdd(CONST.SERVER_SEND,data.nid);
     }else{
       // 超过30min后，下线
       // 自动下线无需操作长连接，node侧长连接失败后，会自动匹配其他节点
       // await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
+      console.log(`heartCheck fail:${ws}`)
       await deleteNodeFinish({'mode':'auto',nid:data.nid})
     }
   }else{
     await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
     startOfflineNode(data.nid).then(result => {
-      console.log(`手动下线成功,nid:${data.nid}`);
+      console.log(`manual offline success,nid:${data.nid}`);
       deleteNodeFinish({'mode':'manual',nid:data.nid})
     }).catch(err => {
-      console.error(`手动下线失败,nid:${data.nid},error:${err}`);
+      console.error(`manual offline fail,nid:${data.nid},error:${err}`);
     })
   }
 }
 
 // 下线节点完成
 export const deleteNodeFinish = async data => {
+  console.log(`deleteNodeFinish:${JSON.stringify(data)}`)
   // 查询ws地址和http地址
   var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(data.nid))
   var http = await myRedis.client.get(CONST.SERVER_SEND_HTTP(data.nid))

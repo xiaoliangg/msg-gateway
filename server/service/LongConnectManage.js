@@ -10,6 +10,7 @@ import * as CONST from '../service/CONST'
  * @returns {Promise<unknown>}
  */
 export const addLongConnect = async data => {
+  console.log(`add new long connect,nid:${nid},uid:${uid}`)
   await myRedis.client.sAdd(CONST.SERVER_ONLINE_UIDS(data.nid),data.uid);
   await myRedis.client.set(CONST.SERVER_ONLINE_BELONG_NID(data.uid),data.nid);
   await myRedis.client.zIncrBy(CONST.SERVER_SEND, 1, data.nid)
@@ -17,13 +18,14 @@ export const addLongConnect = async data => {
 
 // 节点释放长连接
 export const deleteLongConnect = async data => {
+  console.log(`delete new long connect,nid:${nid},uid:${uid}`)
   await myRedis.client.sRem(CONST.SERVER_ONLINE_UIDS(data.nid),data.uid);
   await myRedis.client.del(CONST.SERVER_ONLINE_BELONG_NID(data.uid));
   var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,data.nid);
   if(zRank){ // 如果不存在,zRank会返回null
     await myRedis.client.zIncrBy(CONST.SERVER_SEND, -1, data.nid)
   }else{
-    console.log(`${data.nid}为空,无需减1`)
+    console.log(`${data.nid} null,无需减1`)
   }
 }
 
