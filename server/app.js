@@ -113,8 +113,8 @@ initSendServer()
 
 var options = {
     // ws: true
-    proxyTimeout:1000,
-    timeout:3000
+    proxyTimeout:20000, // timeout (in millis) when proxy receives no response from target
+    timeout:30000 // timeout (in millis) for incoming requests
 }
 var proxy = httpProxy.createProxyServer(options);
 export var server = http.createServer(async function(req, res) {
@@ -209,11 +209,13 @@ proxy.on('error', async function (err, req, res) {
     let sourceHost = req.headers.host;
     let key = sourceHost + req.url;
     let retryTimes = 3;
+    // 根据服务修改重试次数
     if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
         retryTimes = server_dispatch.length
     }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
         retryTimes = server_send.length;
     }
+    // 初始化服务重试次数为0
     let tmp = httpFailsMap.get(key)?httpFailsMap.get(key):0;
     tmp = tmp + 1;
     httpFailsMap.set(key,tmp);
@@ -249,9 +251,14 @@ proxy.on('proxyReqWs', async function(proxyReq, req, socket, options, head) {
 
 //
 // Listen for the `proxyRes` event on `proxy`.
+// http代理成功
 //
 proxy.on('proxyRes', async function (proxyRes, req, res) {
     console.log('RAW Response from the target', JSON.stringify(proxyRes.headers, true, 2));
+    // 清除重试次数记录
+    let sourceHost = req.headers.host;
+    let key = sourceHost + req.url;
+    httpFailsMap.delete(key);
 });
 console.log(`route service listening on port ${routePort}`)
 server.listen(routePort);
@@ -267,7 +274,6 @@ async function routeHttp(req,res){
         server_dispatch.push(target);
         //将HTTP请求传递给目标node进程
         await proxy.web(req,res,{target: target });
-        console.log(`请求成功`)
     }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
         //如果有用户id,通过用户id查找nid。 否则，轮询一个
         parseObj = url.parse(req.url,true);
