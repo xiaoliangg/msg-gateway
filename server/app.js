@@ -144,7 +144,7 @@ export var server = http.createServer(async function(req, res) {
             }
             if(target){
                 //将HTTP请求传递给目标node进程
-                proxy.web(req,res,{target: target });
+                await proxy.web(req,res,{target: target });
             }else{
                 console.error("no awailable service!")
                 res.statusCode = 200;
@@ -195,7 +195,7 @@ server.on('upgrade', async function (req, socket, head) {
 });
 
 proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head) {
-    let sourceHost,parseObj,uid,nid,nids,target,failNodes,nodeFailTimes,zRank,allNodes;
+    let sourceHost,parseObj,uid,nid,target,failNodes,nodeFailTimes,zRank,allNodes;
     parseObj = url.parse(req.url,true);
     uid = parseObj.query.deviceid;
     console.log(`connectOtherNode,uid:${uid},oldNid:${options.nid}`);
@@ -221,19 +221,25 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
             nid = node;
         }
     }
-
-    target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
-    if(target){
-        if(options.nid){
-            // 删除失败nid与uid的关联
-            await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":uid})
+    if(nid){
+        target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
+        if(target){
+            if(options.nid){
+                // 删除失败nid与uid的关联
+                await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":uid})
+            }
+            //将HTTP请求传递给目标node进程
+            await proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
+            // 为新的nid与uid建立关联
+            await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+        }else{
+            console.error(`No Awailable Service! uid:${uid}`)
         }
-        //将HTTP请求传递给目标node进程
-        proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
-        // 为新的nid与uid建立关联
-        await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
     }else{
-        console.error(`No Awailable Service! uid:${uid}`)
+        console.error("nid is null!!")
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('no awailable server!');
     }
 });
 
