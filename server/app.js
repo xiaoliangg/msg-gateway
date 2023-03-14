@@ -168,11 +168,13 @@ export var server = http.createServer(function(req, res) {
 });
 
 server.on('upgrade', function (req, socket, head) {
+    var sourceHost = req.headers.host;
     // ws请求会走此逻辑
     if(req.headers.host.toLowerCase().indexOf(msgSendLongConnectDomain) > -1){
         // 通过域名区分是否长连接，此域名是websocket代理
         console.log(`request:${req.method},${sourceHost},${req.url}`)
         var parseObj = url.parse(req.url,true);
+        var uid = parseObj.query.deviceid;
         console.log(parseObj);
         // 获取节点
         var nid;
@@ -185,9 +187,9 @@ server.on('upgrade', function (req, socket, head) {
             console.log(`${nid} ws host is ${target}`)
             // 新增长连接
             if(target){
-                addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
                 //将HTTP请求传递给目标node进程
-                proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
+                var r = proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
+                addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
             }else{
                 console.error("没有可用的服务!!!!!")
             }
@@ -221,21 +223,21 @@ proxy.on('open', function (proxySocket,uid,nid) {
 });
 
 proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head) {
-    console.log(`connectOtherNode,uid:${uid},oldNid:${options.nid}`);
 
     var parseObj = url.parse(req.url,true);
-
     var nid = null;
     var target;
     var failNodes;
     var nodeFailTimes;
     var allNodes;
+    var uid = parseObj.query.deviceid;
+    console.log(`connectOtherNode,uid:${uid},oldNid:${options.nid}`);
     // 不再使用刚刚失败的节点。轮询其他节点，而不是使用最小连接数的节点。
     // 加入该用户的失败服务集合，并返回最新失败服务集合
     // 如果nid在在线集合，进行处理；如果不在在线集合，说明已经是下线或下线中的节点，则无需进行处理
     var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,options.nid);
     if(zRank){
-        await addFailNodes({uid:parseObj.query.uid,nid:options.nid})
+        await addFailNodes({uid:uid,nid:options.nid})
         // 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
         nodeFailTimes = await incrNodeFailTimes({nid:options.nid})
         if(nodeFailTimes > 20){
@@ -243,19 +245,24 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
             await startDeleteNode({nid:data.nid,mode:'auto'});
         }
     }
-    failNodes = await queryFailNodes({uid:parseObj.query.uid})
+    failNodes = await queryFailNodes({uid:uid})
 
     var allNodes = await myRedis.client.zRange(CONST.SERVER_SEND, 0,50);
+    // yltodo 下面的取节点过程有问题,导致死循环
     try {
         allNodes.forEach(node => {
-            if(nid) throw BreakError;
+            if(nid){
+                throw BreakError;
+            }
             if(!failNodes.indexOf(node) > -1){
                 nid = node;
             }
         })
     } catch(e) {
-        if (e!==BreakError){
+        if (e===BreakError){
             console.log("跳出循环,nid:" + nid);
+        }else{
+            console.log("unknown exception!")
         }
     }
 
@@ -263,12 +270,12 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     if(target){
         if(options.nid){
             // 删除失败nid与uid的关联
-            await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":parseObj.query.uid})
+            await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":options.nid,"uid":uid})
         }
-        // 为新的nid与uid建立关联
-        await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":parseObj.query.uid})
         //将HTTP请求传递给目标node进程
         proxy.ws(req, socket, head,{target: target,switchProtocols:options.switchProtocols,nid:nid});
+        // 为新的nid与uid建立关联
+        await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
     }else{
         console.error(`No Awailable Service! uid:${uid}`)
     }
