@@ -121,7 +121,7 @@ export var server = http.createServer(async function(req, res) {
     sourceHost = req.headers.host;
     console.log(`request:${req.method},${sourceHost},${req.url}`)
     if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
-        console.log(`to msgSend req:${req.method},${req.url}`)
+        console.log(`to msgDispatch req:${req.method},${req.url}`)
         target = server_dispatch.shift();
         server_dispatch.push(target);
         //将HTTP请求传递给目标node进程
@@ -144,12 +144,12 @@ export var server = http.createServer(async function(req, res) {
             }
             if(target){
                 //将HTTP请求传递给目标node进程
-                await proxy.web(req,res,{target: target });
+                await proxy.web(req,res,{target:target});
             }else{
-                console.error("no awailable service!")
+                console.error("no available service!")
                 res.statusCode = 200;
                 res.setHeader('Content-Type', 'text/plain');
-                res.end('route fail,no awailable service!');
+                res.end('route fail,no available service!');
             }
         }else{
             console.error("uid is null!!")
@@ -233,13 +233,13 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
             // 为新的nid与uid建立关联
             await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
         }else{
-            console.error(`No Awailable Service! uid:${uid}`)
+            console.error(`No available Service! uid:${uid}`)
         }
     }else{
         console.error("nid is null!!")
         res.statusCode = 200;
         res.setHeader('Content-Type', 'text/plain');
-        res.end('no awailable server!');
+        res.end('no available server!');
     }
 });
 
