@@ -113,56 +113,12 @@ initSendServer()
 
 var options = {
     // ws: true
+    proxyTimeout:1000,
+    timeout:3000
 }
 var proxy = httpProxy.createProxyServer(options);
 export var server = http.createServer(async function(req, res) {
-    let sourceHost,parseObj,uid,nid,nids,target;
-
-    sourceHost = req.headers.host;
-    console.log(`request:${req.method},${sourceHost},${req.url}`)
-    if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
-        console.log(`to msgDispatch req:${req.method},${req.url}`)
-        target = server_dispatch.shift();
-        server_dispatch.push(target);
-        //将HTTP请求传递给目标node进程
-        await proxy.web(req,res,{target: target });
-    }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
-        //如果有用户id,通过用户id查找nid。 否则，轮询一个
-        parseObj = url.parse(req.url,true);
-        uid = parseObj.query.uid;
-        if(uid){
-            nid = await queryNidByUid(uid);
-            if(nid){
-                // nid不为空说明长连接存在
-                target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
-                console.log(`${uid} belongs node ${nid},${target}`)
-            }else{
-                // nid为空说明没有建立长连接
-                target = server_send.shift();
-                server_send.push(target);
-                console.log(`${uid} belongs no node,send request to ${target}`)
-            }
-            if(target){
-                //将HTTP请求传递给目标node进程
-                await proxy.web(req,res,{target:target});
-            }else{
-                console.error("no available service!")
-                res.statusCode = 200;
-                res.setHeader('Content-Type', 'text/plain');
-                res.end('route fail,no available service!');
-            }
-        }else{
-            console.error("uid is null!!")
-            res.statusCode = 200;
-            res.setHeader('Content-Type', 'text/plain');
-            res.end('route fail,uid is null!');
-        }
-    }else{
-        console.error("wrong http host!")
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'text/plain');
-        res.end('route fail,wrong http host!');
-    }
+    await routeHttp(req,res);
 });
 
 server.on('upgrade', async function (req, socket, head) {
@@ -243,11 +199,29 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     }
 });
 
+// http请求的失败计数,用于请求重试
+var httpFailsMap = new Map();
 //
 // Listen for the `error` event on `proxy`.
 // 对应服务器断开
 proxy.on('error', async function (err, req, res) {
-    console.log('server disconnect error');
+    console.log(`server disconnect error:${err}`);
+    let sourceHost = req.headers.host;
+    let key = sourceHost + req.url;
+    let retryTimes = 3;
+    if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
+        retryTimes = server_dispatch.length
+    }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
+        retryTimes = server_send.length;
+    }
+    let tmp = httpFailsMap.get(key)?httpFailsMap.get(key):0;
+    tmp = tmp + 1;
+    httpFailsMap.set(key,tmp);
+    if(httpFailsMap.get(key) >= retryTimes){
+        console.error("retry times out!!")
+    }else{
+        await routeHttp(req,res)
+    }
 });
 
 //
@@ -281,4 +255,55 @@ proxy.on('proxyRes', async function (proxyRes, req, res) {
 });
 console.log(`route service listening on port ${routePort}`)
 server.listen(routePort);
+
+async function routeHttp(req,res){
+    let sourceHost,parseObj,uid,nid,target;
+
+    sourceHost = req.headers.host;
+    console.log(`request:${req.method},${sourceHost},${req.url}`)
+    if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
+        console.log(`to msgDispatch req:${req.method},${req.url}`)
+        target = server_dispatch.shift();
+        server_dispatch.push(target);
+        //将HTTP请求传递给目标node进程
+        await proxy.web(req,res,{target: target });
+        console.log(`请求成功`)
+    }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
+        //如果有用户id,通过用户id查找nid。 否则，轮询一个
+        parseObj = url.parse(req.url,true);
+        uid = parseObj.query.uid;
+        if(uid){
+            nid = await queryNidByUid(uid);
+            if(nid){
+                // nid不为空说明长连接存在
+                target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
+                console.log(`${uid} belongs node ${nid},${target}`)
+            }else{
+                // nid为空说明没有建立长连接
+                target = server_send.shift();
+                server_send.push(target);
+                console.log(`${uid} belongs no node,send request to ${target}`)
+            }
+            if(target){
+                //将HTTP请求传递给目标node进程
+                await proxy.web(req,res,{target:target});
+            }else{
+                console.error("no available service!")
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end('route fail,no available service!');
+            }
+        }else{
+            console.error("uid is null!!")
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'text/plain');
+            res.end('route fail,uid is null!');
+        }
+    }else{
+        console.error("wrong http host!")
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'text/plain');
+        res.end('route fail,wrong http host!');
+    }
+}
 
