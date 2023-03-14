@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..8f80b65 100644
+index 270f23f..108f698 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -76,7 +76,7 @@ index 270f23f..8f80b65 100644
    /**
     * WebSocket requests must have the `GET` method and
     * the `upgrade:websocket` header
-@@ -97,9 +101,13 @@ module.exports = {
+@@ -97,20 +101,35 @@ module.exports = {
  
      common.setupSocket(socket);
  
@@ -91,7 +91,17 @@ index 270f23f..8f80b65 100644
      var proxyReq = (common.isSSL.test(options.target.protocol) ? https : http).request(
        common.setupOutgoing(options.ssl || {}, options, req)
      );
-@@ -108,9 +116,11 @@ module.exports = {
+ 
++    // var u1 = proxyReq.hasHeader("Upgrade") + proxyReq.getHeader("Upgrade");
++    // var conn = proxyReq.hasHeader("Connection") + proxyReq.getHeader("Connection");
++    // console.log(`${u1},${conn}`)
++    // 之前header是Upgrade,改成upgrade
++    proxyReq.setHeader("Connection","upgrade")
++    // var u1 = proxyReq.hasHeader("Upgrade") + proxyReq.getHeader("Upgrade");
++    // var conn = proxyReq.hasHeader("Connection") + proxyReq.getHeader("Connection");
++    // console.log(`${u1},${conn}`)
++
+     // Enable developers to modify the proxyReq before headers are sent
      if (server) { server.emit('proxyReqWs', proxyReq, req, socket, options, head); }
  
      // Error Handler
@@ -103,7 +113,7 @@ index 270f23f..8f80b65 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,45 +128,81 @@ module.exports = {
+@@ -118,45 +137,81 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
@@ -126,8 +136,8 @@ index 270f23f..8f80b65 100644
 -        server.emit('close', proxyRes, proxySocket, proxyHead);
 +      proxySocket.on('end', function () { // 关闭测试用网页时,会进入此方法，客户端正常断开
 +        var parseObj = url.parse(req.url,true);
-+        conInfo.conInfo.delete(parseObj.query.uid);
-+        server.emit('close', proxyRes, proxySocket, proxyHead,parseObj.query.uid,options.nid);
++        conInfo.conInfo.delete(parseObj.query.deviceid);
++        server.emit('close', proxyRes, proxySocket, proxyHead,parseObj.query.deviceid,options.nid);
        });
  
        // The pipe below will end proxySocket if socket closes cleanly, but not
@@ -152,7 +162,7 @@ index 270f23f..8f80b65 100644
 -      socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers));
 +      var parseObj = url.parse(req.url,true);
 +      // yl 通过传参控制。迁移目标服务连接时，不需要再次写switch Protocols。 其他(首次连接时,首次连接不成功重试其他节点时)需要写switch Protocols
-+      // if(!conInfo.conInfo.get(parseObj.query.uid)){
++      // if(!conInfo.conInfo.get(parseObj.query.deviceid)){
 +      if(options.switchProtocols){
 +        socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers)); // yltodo 二次执行时不知道为何报错
 +      }
@@ -164,10 +174,10 @@ index 270f23f..8f80b65 100644
 +      // 写入用户路由表
 +      var parseObj = url.parse(req.url, true);
 +
-+      server.emit('open', proxySocket,parseObj.query.uid,options.nid);
++      server.emit('open', proxySocket,parseObj.query.deviceid,options.nid);
        server.emit('proxySocket', proxySocket);  //DEPRECATED.
 +
-+      conInfo.conInfo.set(parseObj.query.uid,{req, socket, options, head,proxyReq,proxySocket});
++      conInfo.conInfo.set(parseObj.query.deviceid,{req, socket, options, head,proxyReq,proxySocket});
      });
  
      return proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
