@@ -115,44 +115,42 @@ var options = {
     // ws: true
 }
 var proxy = httpProxy.createProxyServer(options);
-export var server = http.createServer(function(req, res) {
-    var sourceHost = req.headers.host;
+export var server = http.createServer(async function(req, res) {
+    let sourceHost,parseObj,uid,nid,nids,target;
+
+    sourceHost = req.headers.host;
     console.log(`request:${req.method},${sourceHost},${req.url}`)
-    var target = null;
     if(sourceHost.toLowerCase().indexOf(msgDispatchDomain) > -1){
         console.log(`to msgSend req:${req.method},${req.url}`)
         target = server_dispatch.shift();
         server_dispatch.push(target);
         //将HTTP请求传递给目标node进程
-        proxy.web(req,res,{target: target });
+        await proxy.web(req,res,{target: target });
     }else if(sourceHost.toLowerCase().indexOf(msgSendDomain) > -1){
         //如果有用户id,通过用户id查找nid。 否则，轮询一个
-        var parseObj = url.parse(req.url,true);
-        var uid = parseObj.query.uid;
+        parseObj = url.parse(req.url,true);
+        uid = parseObj.query.uid;
         if(uid){
-            (async () => {
-                let nid = await queryNidByUid(uid);
-                if(nid){
-                    // nid不为空说明长连接存在
-                    target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
-                    console.log(`${uid} belongs node ${nid},${target}`)
-                }else{
-                    // nid为空说明没有建立长连接
-                    target = server_send.shift();
-                    server_send.push(target);
-                    console.log(`${uid} belongs no node,send request to ${target}`)
-                }
-                if(target){
-                    //将HTTP请求传递给目标node进程
-                    proxy.web(req,res,{target: target });
-                }else{
-                    console.error("no awailable service!")
-                    res.statusCode = 200;
-                    res.setHeader('Content-Type', 'text/plain');
-                    res.end('route fail,no awailable service!');
-                }
-
-            })();
+            nid = await queryNidByUid(uid);
+            if(nid){
+                // nid不为空说明长连接存在
+                target = await myRedis.client.get(CONST.SERVER_SEND_HTTP(nid))
+                console.log(`${uid} belongs node ${nid},${target}`)
+            }else{
+                // nid为空说明没有建立长连接
+                target = server_send.shift();
+                server_send.push(target);
+                console.log(`${uid} belongs no node,send request to ${target}`)
+            }
+            if(target){
+                //将HTTP请求传递给目标node进程
+                proxy.web(req,res,{target: target });
+            }else{
+                console.error("no awailable service!")
+                res.statusCode = 200;
+                res.setHeader('Content-Type', 'text/plain');
+                res.end('route fail,no awailable service!');
+            }
         }else{
             console.error("uid is null!!")
             res.statusCode = 200;
@@ -167,75 +165,44 @@ export var server = http.createServer(function(req, res) {
     }
 });
 
-server.on('upgrade', function (req, socket, head) {
-    var sourceHost = req.headers.host;
+server.on('upgrade', async function (req, socket, head) {
+    let sourceHost,parseObj,uid,nid,nids,target;
+    sourceHost = req.headers.host;
     // ws请求会走此逻辑
     if(req.headers.host.toLowerCase().indexOf(msgSendLongConnectDomain) > -1){
         // 通过域名区分是否长连接，此域名是websocket代理
         console.log(`request:${req.method},${sourceHost},${req.url}`)
-        var parseObj = url.parse(req.url,true);
-        var uid = parseObj.query.deviceid;
+        parseObj = url.parse(req.url,true);
+        uid = parseObj.query.deviceid;
         console.log(parseObj);
         // 获取节点
-        var nid;
-        var ss = myRedis.client.zRange(CONST.SERVER_SEND, 0,0);
-        ss.then(aa =>{
-            nid = aa[0];
-            console.log(`start query ws host:${nid}`)
-            return myRedis.client.get(CONST.SERVER_SEND_WS(nid));
-        }).then(target =>{
-            console.log(`${nid} ws host is ${target}`)
-            // 新增长连接
-            if(target){
-                //将HTTP请求传递给目标node进程
-                var r = proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
-                addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
-            }else{
-                console.error("没有可用的服务!!!!!")
-            }
-        })
+        nids = await myRedis.client.zRange(CONST.SERVER_SEND, 0,0);
+        nid = nids[0];
+        console.log(`start query ws host:${nid}`)
+        target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid));
+        console.log(`${nid} ws host is ${target}`)
+        // 新增长连接
+        if(target){
+            //将HTTP请求传递给目标node进程
+            await proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
+            await addLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+        }else{
+            console.error("没有可用的服务!!!!!")
+        }
     }else{
         console.error("wrong ws host!!!!!")
     }
 });
 
-//
-// Listen for the `error` event on `proxy`.
-// 貌似对应服务器断开
-proxy.on('error', function (err, req, res) {
-    // res.end('Something went wrong. And we are reporting a custom error message.');
-    console.log('11111111');
-});
-
-proxy.on('proxyReqWs', function(proxyReq, req, socket, options, head) {
-    console.log('RAW proxyReqWs from the target', JSON.stringify(proxyReq.headers, true, 2));
-});
-
-//
-// Listen for the `open` event on `proxy`.
-//
-proxy.on('open', function (proxySocket,uid,nid) {
-    // listen for messages coming FROM the target here
-    // proxySocket.on('data', hybiParseAndLogMessage);
-    console.log(`long connect success,nid:${nid},uid:${uid}`)
-    clearFailNodes({"uid":uid});
-    clearNodeFailTimes({"nid":nid});
-});
-
 proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head) {
-
-    var parseObj = url.parse(req.url,true);
-    var nid = null;
-    var target;
-    var failNodes;
-    var nodeFailTimes;
-    var allNodes;
-    var uid = parseObj.query.deviceid;
+    let sourceHost,parseObj,uid,nid,nids,target,failNodes,nodeFailTimes,zRank,allNodes;
+    parseObj = url.parse(req.url,true);
+    uid = parseObj.query.deviceid;
     console.log(`connectOtherNode,uid:${uid},oldNid:${options.nid}`);
     // 不再使用刚刚失败的节点。轮询其他节点，而不是使用最小连接数的节点。
     // 加入该用户的失败服务集合，并返回最新失败服务集合
     // 如果nid在在线集合，进行处理；如果不在在线集合，说明已经是下线或下线中的节点，则无需进行处理
-    var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,options.nid);
+    zRank = await myRedis.client.zRank(CONST.SERVER_SEND,options.nid);
     if(zRank){
         await addFailNodes({uid:uid,nid:options.nid})
         // 旧的nid连续失败次数+1.判断旧的nid失败超限，开启自动下线流程.
@@ -247,22 +214,11 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     }
     failNodes = await queryFailNodes({uid:uid})
 
-    var allNodes = await myRedis.client.zRange(CONST.SERVER_SEND, 0,50);
-    // yltodo 下面的取节点过程有问题,导致死循环
-    try {
-        allNodes.forEach(node => {
-            if(nid){
-                throw BreakError;
-            }
-            if(!failNodes.indexOf(node) > -1){
-                nid = node;
-            }
-        })
-    } catch(e) {
-        if (e===BreakError){
-            console.log("跳出循环,nid:" + nid);
-        }else{
-            console.log("unknown exception!")
+    allNodes = await myRedis.client.zRange(CONST.SERVER_SEND, 0, 50);
+    for (let i = 0; i < allNodes.length; i++) {
+        let node = allNodes[i];
+        if (!failNodes.indexOf(node) > -1 && nid) {
+            nid = node;
         }
     }
 
@@ -281,18 +237,40 @@ proxy.on('connectOtherNode', async function(proxyReq, req, socket, options, head
     }
 });
 
+//
+// Listen for the `error` event on `proxy`.
+// 对应服务器断开
+proxy.on('error', async function (err, req, res) {
+    console.log('server disconnect error');
+});
+
+//
+// Listen for the `open` event on `proxy`.
+//
+proxy.on('open', async function (proxySocket,uid,nid) {
+    // listen for messages coming FROM the target here
+    // proxySocket.on('data', hybiParseAndLogMessage);
+    console.log(`long connect success,nid:${nid},uid:${uid}`)
+    await clearFailNodes({"uid":uid});
+    await clearNodeFailTimes({"nid":nid});
+});
+
 // Listen for the `close` event on `proxy`.
 // 客户端主动断开
-proxy.on('close', function (res, socket, head,uid,nid) {
+proxy.on('close', async function (res, socket, head,uid,nid) {
     // view disconnected websocket connections
     console.log('Client disconnected');
-    deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+    await deleteLongConnect({"server":CONST.SERVER_SEND,"nid":nid,"uid":uid})
+});
+
+proxy.on('proxyReqWs', async function(proxyReq, req, socket, options, head) {
+    console.log('RAW proxyReqWs from the target', JSON.stringify(proxyReq.headers, true, 2));
 });
 
 //
 // Listen for the `proxyRes` event on `proxy`.
 //
-proxy.on('proxyRes', function (proxyRes, req, res) {
+proxy.on('proxyRes', async function (proxyRes, req, res) {
     console.log('RAW Response from the target', JSON.stringify(proxyRes.headers, true, 2));
 });
 console.log(`route service listening on port ${routePort}`)
