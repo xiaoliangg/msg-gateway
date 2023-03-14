@@ -124,9 +124,8 @@ class Admin {
         res.send(errData)
       })
     }else{
-      throw "未知的server";
+      throw "unknown server error!!";
     }
-
   }
 
   /**

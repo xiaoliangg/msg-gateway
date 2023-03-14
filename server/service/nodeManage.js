@@ -162,12 +162,9 @@ export const deleteNodeFinish = async data => {
  * @returns {Promise<unknown>}
  */
 export const deleteDispatchServer = async data => {
-  return new Promise((resolve, reject) => {
-    myRedis.client.sRem(CONST.SERVER_DISPATCH,data.http);
-    myRedis.client.sAdd(CONST.SERVER_DISPATCH_DOWN,data.http);
-    initDispatchServer();
-    resolve();
-  })
+  await myRedis.client.sRem(CONST.SERVER_DISPATCH,data.http);
+  await myRedis.client.sAdd(CONST.SERVER_DISPATCH_DOWN,data.http);
+  await initDispatchServer();
 }
 
 
@@ -190,7 +187,7 @@ export const queryOnlineNode = async server => {
   }else if(server === CONST.SERVER_DISPATCH){
     return await myRedis.client.sMembers(CONST.SERVER_DISPATCH);
   }else{
-    throw "未知的server";
+    throw "unknown server error!";
   }
 }
 
@@ -200,8 +197,7 @@ export const queryOnlineNode = async server => {
  * @returns {Promise<unknown>}
  */
 export const addFailNodes = async data => {
-  return await myRedis.client.sAdd(CONST.SERVER_FAILED_NODES(data.uid),data.nid);
-
+  await myRedis.client.sAdd(CONST.SERVER_FAILED_NODES(data.uid),data.nid);
 }
 /**
  * 清空用户的失败节点集合
@@ -209,8 +205,7 @@ export const addFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const clearFailNodes = async data => {
-  return await myRedis.client.del(CONST.SERVER_FAILED_NODES(data.uid));
-
+  await myRedis.client.del(CONST.SERVER_FAILED_NODES(data.uid));
 }
 
 /**
@@ -219,7 +214,7 @@ export const clearFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const queryFailNodes = async data => {
-  return await myRedis.client.sMembers(CONST.SERVER_FAILED_NODES(data.uid))
+  await myRedis.client.sMembers(CONST.SERVER_FAILED_NODES(data.uid))
 }
 
 /**
@@ -228,7 +223,7 @@ export const queryFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const incrNodeFailTimes = async data => {
-  return await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
+  await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
 }
 /**
  * 节点的连续失败次数重置为0
