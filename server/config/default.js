@@ -10,7 +10,8 @@ module.exports = {
         routePort: 5051,
         // 心跳检测,单位s
         heartCheckInterval: 60,
-        heartCheckTimeout: 30*60
+        heartCheckTimeout: 30*60,
+        nodeFailTimesLimit: 1
     },
     prod: {
         // conn = redis.Redis(host='10.51.12.89',port=6379,password='udredis-lt4zg0sh')
@@ -24,6 +25,7 @@ module.exports = {
         routePort: 5051,
         // 心跳检测,单位s
         heartCheckInterval: 60,
-        heartCheckTimeout: 30*60
+        heartCheckTimeout: 30*60,
+        nodeFailTimesLimit: 10
     }
 }

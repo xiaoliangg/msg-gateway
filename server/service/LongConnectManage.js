@@ -21,8 +21,8 @@ export const deleteLongConnect = async data => {
   console.log(`delete new long connect,nid:${data.nid},uid:${data.uid}`)
   await myRedis.client.sRem(CONST.SERVER_ONLINE_UIDS(data.nid),data.uid);
   await myRedis.client.del(CONST.SERVER_ONLINE_BELONG_NID(data.uid));
-  var zRank = await myRedis.client.zRank(CONST.SERVER_SEND,data.nid);
-  if(zRank){ // 如果不存在,zRank会返回null
+  var zScore = await myRedis.client.zScore(CONST.SERVER_SEND,data.nid);
+  if(zScore){ // 如果不存在,zScore会返回null
     await myRedis.client.zIncrBy(CONST.SERVER_SEND, -1, data.nid)
   }else{
     console.log(`${data.nid} is null,don't decrease score`)

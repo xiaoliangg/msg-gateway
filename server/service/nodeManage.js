@@ -108,32 +108,35 @@ async function heartCheck(url,interval,timeout) {
 
 // 开始下线节点
 export const startDeleteNode = async data => {
+  let mode,nid;
+  mode = data.mode
+  nid = data.nid
   console.log(`startDeleteNode:${JSON.stringify(data)}`)
-  await myRedis.client.zRem(CONST.SERVER_SEND,data.nid);
+  await myRedis.client.zRem(CONST.SERVER_SEND,nid);
   await initDispatchServer();
   // 移入下线中的节点集合
-  if(data.mode === 'auto'){
+  if(mode === 'auto'){
     // 心跳检测ws地址:每heartCheckInterval check一次，超过heartCheckTimeout后，下线
     var ws = await myRedis.client.get(CONST.SERVER_SEND_WS(nid))
     var success = await heartCheck(ws,heartCheckInterval,heartCheckTimeout);
     if(success){
       // 如果成功,重新加入在线集合
       console.log(`heartCheck success:${ws}`)
-      await myRedis.client.zAdd(CONST.SERVER_SEND,data.nid);
+      await myRedis.client.zAdd(CONST.SERVER_SEND,nid);
     }else{
       // 超过30min后，下线
       // 自动下线无需操作长连接，node侧长连接失败后，会自动匹配其他节点
-      // await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,data.nid);
+      // await myRedis.client.sAdd(CONST.SERVER_SEND_WS_AUTO_DOWNING,nid);
       console.log(`heartCheck fail:${ws}`)
-      await deleteNodeFinish({'mode':'auto',nid:data.nid})
+      await deleteNodeFinish({'mode':'auto',nid:nid})
     }
   }else{
-    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,data.nid);
-    startOfflineNode(data.nid).then(result => {
-      console.log(`manual offline success,nid:${data.nid}`);
-      deleteNodeFinish({'mode':'manual',nid:data.nid})
+    await myRedis.client.sAdd(CONST.SERVER_SEND_WS_MANUAL_DOWNING,nid);
+    startOfflineNode(nid).then(result => {
+      console.log(`manual offline success,nid:${nid}`);
+      deleteNodeFinish({'mode':'manual',nid:nid})
     }).catch(err => {
-      console.error(`manual offline fail,nid:${data.nid},error:${err}`);
+      console.error(`manual offline fail,nid:${nid},error:${err}`);
     })
   }
 }
@@ -214,7 +217,8 @@ export const clearFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const queryFailNodes = async data => {
-  await myRedis.client.sMembers(CONST.SERVER_FAILED_NODES(data.uid))
+  let result = await myRedis.client.sMembers(CONST.SERVER_FAILED_NODES(data.uid))
+  return result;
 }
 
 /**
@@ -223,7 +227,7 @@ export const queryFailNodes = async data => {
  * @returns {Promise<unknown>}
  */
 export const incrNodeFailTimes = async data => {
-  await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
+  return await myRedis.client.incr(CONST.SERVER_NODE_FAIL_TIMES(data.nid));
 }
 /**
  * 节点的连续失败次数重置为0
