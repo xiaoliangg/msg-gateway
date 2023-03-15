@@ -135,15 +135,19 @@ server.on('upgrade', async function (req, socket, head) {
         // 获取节点
         nids = await myRedis.client.zRange(CONST.SERVER_SEND, 0,0);
         nid = nids[0];
-        console.log(`start query ws host:${nid}`)
-        target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid));
-        console.log(`${nid} ws host is ${target}`)
-        // 新增长连接
-        if(target){
-            //将HTTP请求传递给目标node进程
-            await proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
+        if(nid){
+            console.log(`start query ws host:${nid}`)
+            target = await myRedis.client.get(CONST.SERVER_SEND_WS(nid));
+            console.log(`${nid} ws host is ${target}`)
+            // 新增长连接
+            if(target){
+                //将HTTP请求传递给目标node进程
+                await proxy.ws(req, socket, head,{target: target,switchProtocols:true,nid:nid });
+            }else{
+                console.error("没有可用的长连接服务!!!!!")
+            }
         }else{
-            console.error("没有可用的长连接服务!!!!!")
+            console.error("没有可用的长连接服务,nid is null!!!!!")
         }
     }else{
         console.error("wrong ws host!!!!!")
