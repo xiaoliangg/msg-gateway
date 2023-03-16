@@ -1,19 +1,9 @@
 'use strict'
 
-const myRedis = require("../redis/myredis"),
-    extend    = require('util')._extend;
-
-const crypto = require('crypto');
+const myRedis = require("../redis/myredis");
 const conInfo = require('http-proxy/lib/http-proxy/passes/con-info');
-import {
-  deleteLongConnect,
-  queryAllUidsByNid
-} from './LongConnectManage'
+import {queryAllUidsByNid} from './LongConnectManage'
 import * as CONST from '../service/CONST'
-
-import {
-  server
-} from '../app'
 
 export const startOfflineNode = async nid => {
   if (nid) {

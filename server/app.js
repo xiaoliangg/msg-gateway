@@ -12,9 +12,6 @@ import {
     incrNodeFailTimes,
     clearNodeFailTimes, startDeleteNode
 } from './service/nodeManage'
-import {
-    BreakError
-} from './error/error'
 import bodyParser from 'body-parser'
 import * as CONST from "./service/CONST";
 import config from "./config/default";

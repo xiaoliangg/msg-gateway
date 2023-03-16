@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..108f698 100644
+index 270f23f..3f85a38 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -182,7 +182,7 @@ index 270f23f..108f698 100644
  
      return proxyReq.end(); // XXX: CHECK IF THIS IS THIS CORRECT
  
-+    // switchProtocols仍旧使用之前的值，可能对应客户端首次连接时失败(switchProtocols=true)；或已建立长连接后，目标服务异常断开时，再连接新节点时异常(switchProtocols=false)。
++    // switchProtocols仍旧使用之前的值，对应客户端首次连接时失败(switchProtocols=true)；或已建立长连接后，目标服务异常断开时，再连接新节点时异常(switchProtocols=false)。
      function onOutgoingError(err) {
        if (clb) {
          clb(err, req, socket);
