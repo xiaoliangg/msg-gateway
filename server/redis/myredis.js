@@ -2,8 +2,6 @@
 var redis = require('redis');
 import config from '../config/default'
 
-var urlCheck = require("../util/urlCheck");
-
 const redisUrl = process.env.NODE_ENV === 'production' ? config.prod.redisUrl : config.dev.redisUrl
 
 var client = redis.createClient({
@@ -23,19 +21,6 @@ var client = redis.createClient({
 client.on('connect', () => console.log('Connected to Redis') )
 client.connect();
 
-// var url2 = "http://localhost:9095";
-// var url2 = "http://127.0.0.1:9095";
-// var url2 = "https://www.baidu.com/";
-// var url2 = "http://oms.msglongconnect.com:5051";
-var url2 = "http://localhost:10080";
-// var url2 = "http://localhost:15041";
-// var url2 = "ws://localhost:15041";
-
-
-var result = urlCheck.checkUrl(url2);
-result.then(r=>{
-    console.log(`${url2} result:${r}`)
-})
 // var r = client.incr('node_fail_times');
 //
 // client.set('server_send_test','http://localhost:8081');

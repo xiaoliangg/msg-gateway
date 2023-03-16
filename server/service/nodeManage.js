@@ -122,7 +122,7 @@ export const startDeleteNode = async data => {
     if(success){
       // 如果成功,重新加入在线集合
       console.log(`heartCheck success:${ws}`)
-      await myRedis.client.zAdd(CONST.SERVER_SEND,nid);
+      await myRedis.client.zAdd(CONST.SERVER_SEND, { score: 0, value: nid })
     }else{
       // 超过30min后，下线
       // 自动下线无需操作长连接，node侧长连接失败后，会自动匹配其他节点

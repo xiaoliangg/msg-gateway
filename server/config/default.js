@@ -10,7 +10,7 @@ module.exports = {
         routePort: 5051,
         // 心跳检测,单位s
         heartCheckInterval: 5,
-        heartCheckTimeout: 200,
+        heartCheckTimeout: 2000,
         nodeFailTimesLimit: 1
     },
     prod: {
@@ -24,7 +24,7 @@ module.exports = {
         managePort: 3000,
         routePort: 5051,
         // 心跳检测,单位s
-        heartCheckInterval: 60,
+        heartCheckInterval: 10,
         heartCheckTimeout: 30*60,
         nodeFailTimesLimit: 10
     }

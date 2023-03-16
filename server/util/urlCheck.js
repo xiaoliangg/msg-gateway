@@ -39,6 +39,7 @@ exports.checkUrl = async function(urlForCheck){
         console.log(`${urlForCheck} telnetCheck success`)
         return true;
     }else{
+        console.warn(`${urlForCheck} checkUrl fail!`)
         return false;
     }
 }
