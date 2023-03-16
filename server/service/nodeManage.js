@@ -7,7 +7,7 @@ const crypto = require('crypto');
 import {initDispatchServer,initSendServer} from '../app'
 import {startOfflineNode} from './startOfflineNode'
 import * as CONST from '../service/CONST'
-var urlExist = require('url-exist');
+const urlCheck = require("../util/urlCheck");
 
 const heartCheckInterval = process.env.NODE_ENV === 'production' ? config.prod.heartCheckInterval : config.dev.heartCheckInterval
 const heartCheckTimeout = process.env.NODE_ENV === 'production' ? config.prod.heartCheckTimeout : config.dev.heartCheckTimeout
@@ -63,18 +63,18 @@ export const saveNode = async data => {
 /**
  * 心跳检测 每隔 interval 检测url是否可达，直到检测成功或超时
  * @param url
- * @param interval 时间间隔,单位s
- * @param timeout 超时时间,单位s
+ * @param interval 重试时间间隔,单位s
+ * @param timeout 超时时间,重试总时间,单位s
  * @returns {Promise<Promise<unknown> extends PromiseLike<infer U> ? U : Promise<unknown>>}
  */
 async function heartCheck(url,interval,timeout) {
-  console.log(`url heart check:${url},${interval},${timeout}`)
-  var timeoutId = null;
-  var intervalId = null;
-  var p1 = new Promise((resolve,reject) =>{
+  console.log(`url heart check:url:${url},interval:${interval},timeout:${timeout}`)
+  let timeoutId = null;
+  let intervalId = null;
+  let p1 = new Promise((resolve,reject) =>{
     const check = async (url) => {
       console.log(`url heart check:${url}`)
-      const exists = await urlExist(url);
+      const exists = await urlCheck.checkUrl(url);
       if(exists){
         if(intervalId) {
           console.log(`${url}可达,清除定时器`)
@@ -92,7 +92,7 @@ async function heartCheck(url,interval,timeout) {
     intervalId = setInterval(check, interval*1000,url);
   })
 
-  var p2 = new Promise((resolve,reject) =>{
+  let p2 = new Promise((resolve,reject) =>{
     const fn2 = () => {
       if(intervalId) {
         console.log(`${url}检测超时,清除定时器并返回false`)
@@ -156,6 +156,7 @@ export const deleteNodeFinish = async data => {
   }
   await myRedis.client.del(CONST.SERVER_SEND_WS(data.nid))
   await myRedis.client.del(CONST.SERVER_SEND_HTTP(data.nid))
+  await clearNodeFailTimes({"nid":data.nid});
   await initDispatchServer();
 }
 
