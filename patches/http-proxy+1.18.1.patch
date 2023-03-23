@@ -54,7 +54,7 @@ index 0000000..6ca9309
 +    conInfo: new Map()
 +};
 diff --git a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
-index 270f23f..3f85a38 100644
+index 270f23f..e8ac779 100644
 --- a/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 +++ b/node_modules/http-proxy/lib/http-proxy/passes/ws-incoming.js
 @@ -1,6 +1,9 @@
@@ -113,7 +113,7 @@ index 270f23f..3f85a38 100644
        if (!res.upgrade) {
          socket.write(createHttpHeader('HTTP/' + res.httpVersion + ' ' + res.statusCode + ' ' + res.statusMessage, res.headers));
          res.pipe(socket);
-@@ -118,45 +137,81 @@ module.exports = {
+@@ -118,45 +137,82 @@ module.exports = {
      });
  
      proxyReq.on('upgrade', function(proxyRes, proxySocket, proxyHead) {
@@ -161,10 +161,11 @@ index 270f23f..3f85a38 100644
        //
 -      socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers));
 +      var parseObj = url.parse(req.url,true);
-+      // yl 通过传参控制。迁移目标服务连接时，不需要再次写switch Protocols。 其他(首次连接时,首次连接不成功重试其他节点时)需要写switch Protocols
++      // 多次执行会报错
++      // 通过传参控制。迁移目标服务连接时，不需要再次写switch Protocols。 其他(首次连接时,首次连接不成功重试其他节点时)需要写switch Protocols
 +      // if(!conInfo.conInfo.get(parseObj.query.deviceid)){
 +      if(options.switchProtocols){
-+        socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers)); // yltodo 二次执行时不知道为何报错
++        socket.write(createHttpHeader('HTTP/1.1 101 Switching Protocols', proxyRes.headers));
 +      }
 +      // }
  
